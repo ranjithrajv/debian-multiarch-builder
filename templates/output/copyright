@@ -1,0 +1,20 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: PACKAGE_NAME
+Upstream-Contact: Upstream Author <upstream@example.com>
+Source: https://github.com/GITHUB_REPO
+
+Files: *
+Copyright: YEAR Upstream Author <upstream@example.com>
+License: LICENSE-TYPE
+ Full license text here or reference to common license.
+
+Files: debian/*
+Copyright: YEAR Your Name <your.email@example.com>
+License: LICENSE-TYPE
+ Full license text here or reference to common license.
+
+License: LICENSE-TYPE
+ Full license text or reference such as:
+ .
+ On Debian systems, the complete text of the LICENSE-TYPE
+ License can be found in `/usr/share/common-licenses/LICENSE-TYPE'.
