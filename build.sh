@@ -24,6 +24,8 @@ PACKAGE_NAME=$(yq eval '.package_name' "$CONFIG_FILE")
 GITHUB_REPO=$(yq eval '.github_repo' "$CONFIG_FILE")
 ARTIFACT_FORMAT=$(yq eval '.artifact_format // "tar.gz"' "$CONFIG_FILE")
 BINARY_PATH=$(yq eval '.binary_path // ""' "$CONFIG_FILE")
+PARALLEL_BUILDS=$(yq eval '.parallel_builds // true' "$CONFIG_FILE")
+MAX_PARALLEL=$(yq eval '.max_parallel // 2' "$CONFIG_FILE")
 
 echo "Building $PACKAGE_NAME version $VERSION"
 echo "GitHub repo: $GITHUB_REPO"
@@ -183,31 +185,206 @@ build_architecture() {
     return 0
 }
 
+# Function to build architecture with logging to file
+build_architecture_parallel() {
+    local build_arch=$1
+    local log_file="build_${build_arch}.log"
+
+    # Redirect all output to log file
+    {
+        if build_architecture "$build_arch"; then
+            echo "SUCCESS" > "build_${build_arch}.status"
+        else
+            echo "FAILED" > "build_${build_arch}.status"
+            return 1
+        fi
+    } > "$log_file" 2>&1
+}
+
+# Function to monitor parallel builds
+monitor_builds() {
+    local pids=("$@")
+    local completed=0
+    local total=${#pids[@]}
+    local failed_archs=()
+
+    while [ $completed -lt $total ]; do
+        completed=0
+        for pid in "${pids[@]}"; do
+            if ! kill -0 $pid 2>/dev/null; then
+                ((completed++))
+            fi
+        done
+
+        # Show progress
+        echo -ne "\r⏳ Progress: $completed/$total architectures completed"
+        sleep 1
+    done
+    echo ""
+
+    # Check for failures
+    for arch_file in build_*.status; do
+        if [ -f "$arch_file" ]; then
+            arch=$(echo "$arch_file" | sed 's/build_\(.*\)\.status/\1/')
+            status=$(cat "$arch_file")
+            if [ "$status" = "FAILED" ]; then
+                failed_archs+=("$arch")
+            fi
+            rm -f "$arch_file"
+        fi
+    done
+
+    # Display results
+    if [ ${#failed_archs[@]} -gt 0 ]; then
+        echo ""
+        echo "❌ Failed architectures: ${failed_archs[*]}"
+        echo ""
+        echo "=== Build Logs ==="
+        for arch in "${failed_archs[@]}"; do
+            echo ""
+            echo "--- $arch ---"
+            cat "build_${arch}.log" 2>/dev/null || echo "No log available"
+        done
+        return 1
+    fi
+
+    return 0
+}
+
 # Main build logic
 if [ "$ARCH" = "all" ]; then
     echo "🚀 Building $PACKAGE_NAME $VERSION-$BUILD_VERSION for all supported architectures..."
-    echo ""
 
     # Get all supported architectures from config
     ARCHITECTURES=$(get_supported_architectures)
+    ARCH_ARRAY=($ARCHITECTURES)
+    TOTAL_ARCHS=${#ARCH_ARRAY[@]}
 
-    for build_arch in $ARCHITECTURES; do
-        if ! build_architecture "$build_arch"; then
-            echo "❌ Failed to build for $build_arch"
+    if [ "$PARALLEL_BUILDS" = "true" ]; then
+        echo "⚡ Parallel builds enabled (max: $MAX_PARALLEL concurrent)"
+        echo ""
+
+        declare -a pids=()
+        declare -a active_archs=()
+        local arch_index=0
+
+        # Start initial batch of builds
+        for build_arch in "${ARCH_ARRAY[@]}"; do
+            if [ ${#pids[@]} -lt $MAX_PARALLEL ]; then
+                echo "🔨 Starting build for $build_arch (${arch_index}/$TOTAL_ARCHS)..."
+                build_architecture_parallel "$build_arch" &
+                pids+=($!)
+                active_archs+=("$build_arch")
+                ((arch_index++))
+            else
+                break
+            fi
+        done
+
+        # As builds complete, start new ones
+        while [ $arch_index -lt $TOTAL_ARCHS ] || [ ${#pids[@]} -gt 0 ]; do
+            # Check for completed builds
+            for i in "${!pids[@]}"; do
+                pid=${pids[$i]}
+                if ! kill -0 $pid 2>/dev/null; then
+                    # Build completed
+                    wait $pid
+                    exit_code=$?
+
+                    arch=${active_archs[$i]}
+                    if [ $exit_code -eq 0 ]; then
+                        echo "✅ Completed build for $arch"
+                    else
+                        echo "❌ Failed build for $arch"
+                    fi
+
+                    # Remove from active arrays
+                    unset pids[$i]
+                    unset active_archs[$i]
+                    pids=("${pids[@]}")  # Reindex
+                    active_archs=("${active_archs[@]}")
+
+                    # Start next build if available
+                    if [ $arch_index -lt $TOTAL_ARCHS ]; then
+                        next_arch="${ARCH_ARRAY[$arch_index]}"
+                        echo "🔨 Starting build for $next_arch ($((arch_index+1))/$TOTAL_ARCHS)..."
+                        build_architecture_parallel "$next_arch" &
+                        pids+=($!)
+                        active_archs+=("$next_arch")
+                        ((arch_index++))
+                    fi
+
+                    break
+                fi
+            done
+
+            sleep 1
+        done
+
+        # Check for any failures
+        failed=false
+        for arch in "${ARCH_ARRAY[@]}"; do
+            if [ -f "build_${arch}.status" ]; then
+                status=$(cat "build_${arch}.status")
+                if [ "$status" = "FAILED" ]; then
+                    failed=true
+                    echo ""
+                    echo "❌ Build failed for $arch. Log:"
+                    cat "build_${arch}.log"
+                fi
+                rm -f "build_${arch}.status" "build_${arch}.log"
+            fi
+        done
+
+        if [ "$failed" = "true" ]; then
+            echo ""
+            echo "❌ Some builds failed"
             exit 1
         fi
-        echo ""
-    done
 
+    else
+        # Sequential builds (original behavior)
+        echo "Building architectures sequentially..."
+        echo ""
+
+        local current=0
+        for build_arch in "${ARCH_ARRAY[@]}"; do
+            ((current++))
+            echo "=========================================="
+            echo "Building $current/$TOTAL_ARCHS: $build_arch"
+            echo "=========================================="
+
+            if ! build_architecture "$build_arch"; then
+                echo "❌ Failed to build for $build_arch"
+                exit 1
+            fi
+            echo ""
+        done
+    fi
+
+    echo ""
+    echo "=========================================="
     echo "🎉 All architectures built successfully!"
+    echo "=========================================="
+    echo ""
     echo "Generated packages:"
-    ls -la ${PACKAGE_NAME}_*.deb
+    ls -lh ${PACKAGE_NAME}_*.deb | awk '{print "  " $9 " (" $5 ")"}'
+    echo ""
+    TOTAL_PACKAGES=$(ls ${PACKAGE_NAME}_*.deb 2>/dev/null | wc -l)
+    echo "✅ Total: $TOTAL_PACKAGES packages"
 else
     # Build for single architecture
+    echo "Building for single architecture: $ARCH"
+    echo ""
+
     if ! build_architecture "$ARCH"; then
         exit 1
     fi
 
+    echo ""
     echo "Generated packages:"
-    ls -la ${PACKAGE_NAME}_*.deb
+    ls -lh ${PACKAGE_NAME}_*.deb | awk '{print "  " $9 " (" $5 ")"}'
+    echo ""
+    TOTAL_PACKAGES=$(ls ${PACKAGE_NAME}_*.deb 2>/dev/null | wc -l)
+    echo "✅ Total: $TOTAL_PACKAGES packages"
 fi
