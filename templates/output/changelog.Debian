@@ -1,0 +1,5 @@
+PACKAGE_NAME (FULL_VERSION) DIST; urgency=medium
+
+  * New upstream release VERSION
+
+ -- Your Name <your.email@example.com>  Mon, 01 Jan 2024 00:00:00 +0000

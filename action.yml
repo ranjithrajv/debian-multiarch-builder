@@ -1,0 +1,76 @@
+name: 'Debian Multi-Architecture Package Builder'
+description: 'Build Debian packages for multiple architectures from upstream releases'
+author: 'ranjithrajv'
+
+branding:
+  icon: 'package'
+  color: 'red'
+
+inputs:
+  config-file:
+    description: 'Path to the multiarch configuration YAML file'
+    required: true
+  version:
+    description: 'Version of the software to build'
+    required: true
+  build-version:
+    description: 'Debian build version number'
+    required: true
+  architecture:
+    description: 'Architecture to build (amd64, arm64, armel, armhf, ppc64el, s390x, riscv64, or "all")'
+    required: false
+    default: 'all'
+
+outputs:
+  packages:
+    description: 'List of generated .deb package files'
+    value: ${{ steps.build.outputs.packages }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install dependencies
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y wget tar gzip yq
+
+    - name: Validate configuration
+      shell: bash
+      run: |
+        if [ ! -f "${{ inputs.config-file }}" ]; then
+          echo "Error: Configuration file not found: ${{ inputs.config-file }}"
+          exit 1
+        fi
+        echo "Configuration file found: ${{ inputs.config-file }}"
+
+    - name: Build packages
+      id: build
+      shell: bash
+      env:
+        CONFIG_FILE: ${{ inputs.config-file }}
+        VERSION: ${{ inputs.version }}
+        BUILD_VERSION: ${{ inputs.build-version }}
+        ARCHITECTURE: ${{ inputs.architecture }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        echo "Starting multi-architecture build..."
+        echo "Config: $CONFIG_FILE"
+        echo "Version: $VERSION"
+        echo "Build Version: $BUILD_VERSION"
+        echo "Architecture: $ARCHITECTURE"
+
+        # Copy build script from action to working directory
+        cp "$ACTION_PATH/build.sh" ./build.sh
+        chmod +x ./build.sh
+
+        # Copy Dockerfile from action to working directory
+        cp "$ACTION_PATH/Dockerfile" ./Dockerfile
+
+        # Run the build
+        ./build.sh "$CONFIG_FILE" "$VERSION" "$BUILD_VERSION" "$ARCHITECTURE"
+
+        # Collect generated packages
+        PACKAGES=$(ls *.deb 2>/dev/null | tr '\n' ' ' || echo "")
+        echo "packages=$PACKAGES" >> $GITHUB_OUTPUT
+        echo "Generated packages: $PACKAGES"

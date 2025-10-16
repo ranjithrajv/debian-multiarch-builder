@@ -1,0 +1,12 @@
+Section: utils
+Priority: optional
+Maintainer: Your Name <your.email@example.com>
+Homepage: https://github.com/GITHUB_REPO
+Package: PACKAGE_NAME
+Version: VERSION-BUILD_VERSION+DIST
+Architecture: SUPPORTED_ARCHITECTURES
+Description: Short description of your package
+ Longer description of your package that can span multiple lines.
+ Each continuation line should start with a space.
+ .
+ You can have multiple paragraphs separated by a line with just a dot.

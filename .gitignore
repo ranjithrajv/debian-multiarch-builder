@@ -1,0 +1,31 @@
+# Build artifacts
+*.deb
+*.tar.gz
+*.zip
+*.tgz
+
+# Extracted archives
+*-unknown-linux-*
+*-linux-*
+*/bin/
+*/usr/
+
+# Docker
+.dockerignore
+
+# OS files
+.DS_Store
+Thumbs.db
+.directory
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.editorconfig
+
+# Test files
+test-output/
+test-builds/

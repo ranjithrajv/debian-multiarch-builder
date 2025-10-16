@@ -1,0 +1,38 @@
+# Multi-architecture configuration for lazygit
+package_name: lazygit
+github_repo: jesseduffield/lazygit
+artifact_format: tar.gz
+
+# Debian distributions to build for
+debian_distributions:
+  - bookworm
+  - trixie
+  - forky
+  - sid
+
+# Architecture mappings
+# {version} will be replaced with the actual version number
+architectures:
+  amd64:
+    release_pattern: "lazygit_{version}_Linux_x86_64.tar.gz"
+
+  arm64:
+    release_pattern: "lazygit_{version}_Linux_arm64.tar.gz"
+
+  armhf:
+    release_pattern: "lazygit_{version}_Linux_armv7.tar.gz"
+
+  # Add more architectures as they become available upstream
+  # armel:
+  #   release_pattern: "lazygit_{version}_Linux_arm.tar.gz"
+
+# Optional: Specify which architectures are supported for specific distributions
+# distribution_arch_overrides:
+#   riscv64:
+#     distributions:
+#       - trixie
+#       - forky
+#       - sid
+
+# Optional: If binary is in a subdirectory after extraction
+# binary_path: ""
