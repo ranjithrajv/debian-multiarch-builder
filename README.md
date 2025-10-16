@@ -265,7 +265,16 @@ Based on the multi-architecture work in [uv-debian](https://github.com/dariogrif
 
 For use with packages hosted at [debian.griffo.io](https://debian.griffo.io) by [@dariogriffo](https://github.com/dariogriffo)
 
+## Troubleshooting
+
+See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for common issues and solutions.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release history and changes.
+
 ## Support
 
 - Report issues: [GitHub Issues](https://github.com/ranjithrajv/debian-multiarch-builder/issues)
 - Discussions: [GitHub Discussions](https://github.com/ranjithrajv/debian-multiarch-builder/discussions)
+- Documentation: Check README.md, USAGE.md, and TROUBLESHOOTING.md
