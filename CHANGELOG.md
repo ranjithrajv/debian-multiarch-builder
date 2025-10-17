@@ -15,9 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Prefers gnu builds over musl (native to Debian, better performance)
   - Backward compatible with manual `release_pattern` configuration
   - Significantly reduces configuration complexity
-- **Parallel builds support** - Build multiple architectures concurrently (40-60% faster)
+- **Parallel architecture builds** - Build multiple architectures concurrently (40-60% faster)
   - Configurable with `parallel_builds` and `max_parallel` settings
-  - Default: 2 concurrent builds
+  - Default: 2 concurrent architecture builds
+- **Parallel distribution builds** - Build all distributions concurrently for each architecture (3-4x faster per architecture)
+  - Automatically enabled - builds bookworm, trixie, forky, sid in parallel
+  - Combines with parallel architecture builds for maximum throughput
+- **Download caching** - Download and extract once per architecture, reuse for all distributions
+  - Eliminates redundant downloads (previously downloaded 4 times per architecture)
+  - Significantly reduces bandwidth usage and build time
 - **i386 architecture support** - Added support for i386 (Bookworm only)
 - **armel lifecycle documentation** - Documented armel end-of-life (last release in Trixie)
 - **Documentation restructure** - Organized docs into `docs/` directory
