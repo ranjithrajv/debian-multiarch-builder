@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Parallel build orchestration functions
+# Build orchestration functions (parallel and sequential)
 
 # Function to build architecture with logging to file (for parallel builds)
 build_architecture_parallel() {
