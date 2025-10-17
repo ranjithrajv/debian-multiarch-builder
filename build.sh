@@ -297,6 +297,41 @@ validate_release() {
     return 0
 }
 
+# Function to build a package for a specific distribution
+build_distribution() {
+    local build_arch=$1
+    local dist=$2
+    local binary_source=$3
+
+    FULL_VERSION="${VERSION}-${BUILD_VERSION}+${dist}_${build_arch}"
+
+    if ! docker build . -t "${PACKAGE_NAME}-${dist}-${build_arch}" \
+        --build-arg DEBIAN_DIST="$dist" \
+        --build-arg PACKAGE_NAME="$PACKAGE_NAME" \
+        --build-arg VERSION="$VERSION" \
+        --build-arg BUILD_VERSION="$BUILD_VERSION" \
+        --build-arg FULL_VERSION="$FULL_VERSION" \
+        --build-arg ARCH="$build_arch" \
+        --build-arg BINARY_SOURCE="$binary_source" \
+        --build-arg GITHUB_REPO="$GITHUB_REPO" 2>&1; then
+        return 1
+    fi
+
+    id="$(docker create "${PACKAGE_NAME}-${dist}-${build_arch}")"
+    if ! docker cp "$id:/${PACKAGE_NAME}_${FULL_VERSION}.deb" - > "./${PACKAGE_NAME}_${FULL_VERSION}.deb" 2>&1; then
+        docker rm "$id" || true
+        return 1
+    fi
+
+    docker rm "$id" || true
+
+    if ! tar -xf "./${PACKAGE_NAME}_${FULL_VERSION}.deb" 2>&1; then
+        return 1
+    fi
+
+    return 0
+}
+
 # Function to build for a specific architecture
 build_architecture() {
     local build_arch=$1
@@ -325,7 +360,7 @@ build_architecture() {
         rm -f "$archive_name" || true
     fi
 
-    # Download the release artifact
+    # Download the release artifact (ONCE for all distributions)
     local download_url="https://github.com/${GITHUB_REPO}/releases/download/${VERSION}/${release_pattern}"
     info "Downloading from: $download_url"
 
@@ -349,7 +384,7 @@ Please check:
 
     success "Downloaded $archive_name"
 
-    # Extract the archive based on format
+    # Extract the archive based on format (ONCE for all distributions)
     info "Extracting $archive_name..."
     case "$ARTIFACT_FORMAT" in
         "tar.gz"|"tgz")
@@ -390,8 +425,13 @@ If binaries are in a subdirectory, add 'binary_path' to your config:
   binary_path: \"subdirectory/name\""
     fi
 
-    # Build packages for each Debian distribution
+    # Build packages for each Debian distribution IN PARALLEL
+    info "Building packages for all distributions in parallel..."
+
+    declare -a dist_pids=()
+    declare -a dist_names=()
     local dist_count=0
+
     for dist in $DISTRIBUTIONS; do
         # Check if this architecture is supported for this distribution
         if ! is_arch_supported_for_dist "$build_arch" "$dist"; then
@@ -400,41 +440,61 @@ If binaries are in a subdirectory, add 'binary_path' to your config:
         fi
 
         dist_count=$((dist_count + 1))
-        FULL_VERSION="${VERSION}-${BUILD_VERSION}+${dist}_${build_arch}"
-        info "Building package $dist_count for $dist: $FULL_VERSION"
+        info "Starting build for $dist..."
 
-        if ! docker build . -t "${PACKAGE_NAME}-${dist}-${build_arch}" \
-            --build-arg DEBIAN_DIST="$dist" \
-            --build-arg PACKAGE_NAME="$PACKAGE_NAME" \
-            --build-arg VERSION="$VERSION" \
-            --build-arg BUILD_VERSION="$BUILD_VERSION" \
-            --build-arg FULL_VERSION="$FULL_VERSION" \
-            --build-arg ARCH="$build_arch" \
-            --build-arg BINARY_SOURCE="$binary_source" \
-            --build-arg GITHUB_REPO="$GITHUB_REPO" 2>&1; then
-            error "Failed to build Docker image for $dist on $build_arch
+        # Build distribution in background
+        (
+            if build_distribution "$build_arch" "$dist" "$binary_source"; then
+                echo "SUCCESS" > "build_${build_arch}_${dist}.status"
+            else
+                echo "FAILED" > "build_${build_arch}_${dist}.status"
+                exit 1
+            fi
+        ) > "build_${build_arch}_${dist}.log" 2>&1 &
 
-Check Dockerfile and output/DEBIAN/control for issues"
-        fi
-
-        id="$(docker create "${PACKAGE_NAME}-${dist}-${build_arch}")"
-        if ! docker cp "$id:/${PACKAGE_NAME}_${FULL_VERSION}.deb" - > "./${PACKAGE_NAME}_${FULL_VERSION}.deb" 2>&1; then
-            docker rm "$id" || true
-            error "Failed to extract .deb package for $dist on $build_arch"
-        fi
-
-        docker rm "$id" || true
-
-        if ! tar -xf "./${PACKAGE_NAME}_${FULL_VERSION}.deb" 2>&1; then
-            error "Failed to extract .deb contents for $dist on $build_arch"
-        fi
-
-        success "Built ${PACKAGE_NAME}_${FULL_VERSION}.deb"
+        dist_pids+=($!)
+        dist_names+=("$dist")
     done
 
     if [ $dist_count -eq 0 ]; then
         warning "No packages built for $build_arch (all distributions skipped)"
+        rm -rf "$extract_dir" || true
+        return 0
     fi
+
+    # Wait for all distribution builds to complete
+    info "Waiting for $dist_count distribution builds to complete..."
+    local failed_dists=()
+
+    for i in "${!dist_pids[@]}"; do
+        pid=${dist_pids[$i]}
+        dist=${dist_names[$i]}
+
+        if wait $pid; then
+            success "Built ${PACKAGE_NAME} for $dist"
+        else
+            failed_dists+=("$dist")
+            warning "Failed to build for $dist"
+        fi
+
+        # Clean up status files
+        rm -f "build_${build_arch}_${dist}.status"
+    done
+
+    # Display any failures
+    if [ ${#failed_dists[@]} -gt 0 ]; then
+        error "Failed to build $build_arch for distributions: ${failed_dists[*]}
+
+Check logs:
+$(for dist in "${failed_dists[@]}"; do
+    echo "  build_${build_arch}_${dist}.log"
+done)"
+    fi
+
+    # Clean up log files
+    for dist in "${dist_names[@]}"; do
+        rm -f "build_${build_arch}_${dist}.log"
+    done
 
     # Clean up extracted directory
     rm -rf "$extract_dir" || true
