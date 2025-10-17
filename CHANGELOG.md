@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Verifies integrity of downloaded archives before extraction
   - Fails build if checksum mismatch detected (prevents corrupted/tampered files)
   - Gracefully handles missing checksums (optional verification)
+- **Build summary JSON** - Automated build metadata export for CI/CD integration
+  - Generates `build-summary.json` with comprehensive build information
+  - Includes package details, build duration, timestamps, and file sizes
+  - Easy parsing for automation, artifact upload, and release notes generation
+  - Compatible with GitHub Actions and other CI/CD platforms
 - **i386 architecture support** - Added support for i386 (Bookworm only)
 - **armel lifecycle documentation** - Documented armel end-of-life (last release in Trixie)
 - **Documentation restructure** - Organized docs into `docs/` directory
