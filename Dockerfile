@@ -33,7 +33,10 @@ COPY output/copyright /output/usr/share/doc/${PACKAGE_NAME}/
 COPY output/changelog.Debian /output/usr/share/doc/${PACKAGE_NAME}/
 
 # Copy README if it exists (optional)
-COPY output/README.md /output/usr/share/doc/${PACKAGE_NAME}/ 2>/dev/null || true
+COPY output/ /tmp/package-files/
+RUN if [ -f /tmp/package-files/README.md ]; then \
+        cp /tmp/package-files/README.md /output/usr/share/doc/${PACKAGE_NAME}/; \
+    fi
 
 # Compress changelog
 RUN gzip -9 /output/usr/share/doc/${PACKAGE_NAME}/changelog.Debian
@@ -41,8 +44,8 @@ RUN gzip -9 /output/usr/share/doc/${PACKAGE_NAME}/changelog.Debian
 # Replace placeholders in control file
 RUN sed -i "s/PACKAGE_NAME/${PACKAGE_NAME}/g" /output/DEBIAN/control
 RUN sed -i "s/DIST/${DEBIAN_DIST}/g" /output/DEBIAN/control
-RUN sed -i "s/VERSION/${VERSION}/g" /output/DEBIAN/control
 RUN sed -i "s/BUILD_VERSION/${BUILD_VERSION}/g" /output/DEBIAN/control
+RUN sed -i "s/VERSION/${VERSION}/g" /output/DEBIAN/control
 RUN sed -i "s/SUPPORTED_ARCHITECTURES/${ARCH}/g" /output/DEBIAN/control
 RUN sed -i "s|GITHUB_REPO|${GITHUB_REPO}|g" /output/DEBIAN/control
 
