@@ -39,6 +39,7 @@ your-package-debian/
 
 Create a `multiarch-config.yaml` in your repository root:
 
+**Option A: Auto-discovery (Recommended)**
 ```yaml
 package_name: lazygit
 github_repo: jesseduffield/lazygit
@@ -50,6 +51,26 @@ debian_distributions:
   - forky
   - sid
 
+# Simple list - release patterns auto-discovered from GitHub
+architectures:
+  - amd64
+  - arm64
+  - armhf
+```
+
+**Option B: Manual patterns (Advanced)**
+```yaml
+package_name: lazygit
+github_repo: jesseduffield/lazygit
+artifact_format: tar.gz
+
+debian_distributions:
+  - bookworm
+  - trixie
+  - forky
+  - sid
+
+# Explicit patterns for full control
 architectures:
   amd64:
     release_pattern: "lazygit_{version}_Linux_x86_64.tar.gz"
@@ -181,6 +202,56 @@ max_parallel: 2          # Default: 2 (concurrent builds)
 | Parallel (2 cores) | ~2-3 minutes | 50-60% faster |
 | Parallel (4 cores) | ~1.5-2 minutes | 67-75% faster |
 
+## Auto-Discovery
+
+The action can automatically discover release patterns from GitHub releases, eliminating the need to manually configure `release_pattern` for each architecture.
+
+### How It Works
+
+1. **Fetches release assets** from GitHub API for the specified version
+2. **Matches assets** to architectures using common naming patterns
+3. **Prefers musl builds** when available (better compatibility)
+4. **Falls back to gnu builds** if musl not available
+
+### Supported Pattern Matching
+
+| Debian Arch | Matches Upstream Patterns |
+|-------------|---------------------------|
+| amd64       | x86_64, amd64, x64 |
+| arm64       | aarch64, arm64 |
+| armel       | arm-, armeabi |
+| armhf       | armv7, armhf, arm-.*gnueabihf |
+| i386        | i686, i386, x86 |
+| ppc64el     | powerpc64le, ppc64le |
+| s390x       | s390x |
+| riscv64     | riscv64gc, riscv64 |
+
+### When to Use Manual Patterns
+
+Use manual `release_pattern` configuration when:
+- Upstream uses non-standard naming conventions
+- You need to select a specific variant (e.g., gnu vs musl)
+- Release assets don't follow predictable patterns
+- You want explicit control over which assets are used
+
+### Example Comparison
+
+**Auto-discovery:**
+```yaml
+architectures:
+  - amd64
+  - arm64
+  - armhf
+```
+Discovers: `uv-x86_64-unknown-linux-musl.tar.gz`, `uv-aarch64-unknown-linux-musl.tar.gz`, etc.
+
+**Manual:**
+```yaml
+architectures:
+  amd64:
+    release_pattern: "uv-x86_64-unknown-linux-gnu.tar.gz"  # Specific variant
+```
+
 ## Configuration Reference
 
 ### Configuration File Structure
@@ -198,7 +269,15 @@ debian_distributions:
   - forky
   - sid
 
-# Architecture mappings
+# Architecture Configuration (choose one format)
+
+# Format 1: Auto-discovery (simple list)
+architectures:
+  - amd64
+  - arm64
+  - armhf
+
+# Format 2: Manual patterns (object with release_pattern)
 architectures:
   <debian-arch>:
     release_pattern: string    # Pattern with {version} placeholder

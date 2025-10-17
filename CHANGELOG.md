@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Auto-discovery of release patterns** - Automatically discover release assets from GitHub
+  - Simple list format for architectures (e.g., `architectures: [amd64, arm64]`)
+  - Fetches release assets from GitHub API
+  - Smart pattern matching for common architecture names
+  - Prefers musl builds over gnu for better compatibility
+  - Backward compatible with manual `release_pattern` configuration
+  - Significantly reduces configuration complexity
 - **Parallel builds support** - Build multiple architectures concurrently (40-60% faster)
   - Configurable with `parallel_builds` and `max_parallel` settings
   - Default: 2 concurrent builds
@@ -16,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Documentation restructure** - Organized docs into `docs/` directory
   - Created `docs/MIGRATION.md` for migration guides
   - Moved `docs/USAGE.md` and `docs/TROUBLESHOOTING.md`
+  - Added CONTRIBUTING.md with contribution guidelines
+  - Added GitHub issue templates (bug report, feature request, documentation)
 - Distribution-specific architecture example configuration
 - Comprehensive error messages with helpful diagnostics
 - Color-coded output (errors in red, success in green, warnings in yellow, info in blue)
