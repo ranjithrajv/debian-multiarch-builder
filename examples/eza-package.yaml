@@ -1,0 +1,28 @@
+# Package definition for eza
+# This file contains the core package configuration
+# Optional customizations should go in overrides.yaml
+
+package_name: eza
+github_repo: eza-community/eza
+artifact_format: tar.gz
+
+# Debian distributions to build for
+debian_distributions:
+  - bookworm
+  - trixie
+  - forky
+  - sid
+
+# Manual mode: Explicit release patterns
+# Use this when auto-discovery doesn't work or you want specific control
+architectures:
+  amd64:
+    release_pattern: "eza_x86_64-unknown-linux-musl.tar.gz"
+
+  arm64:
+    release_pattern: "eza_aarch64-unknown-linux-gnu.tar.gz"
+
+  armhf:
+    release_pattern: "eza_arm-unknown-linux-gnueabihf.tar.gz"
+
+  # Add more architectures as they become available upstream

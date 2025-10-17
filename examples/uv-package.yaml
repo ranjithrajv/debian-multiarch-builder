@@ -1,0 +1,19 @@
+# Package definition for uv
+# Core package configuration
+
+package_name: uv
+github_repo: astral-sh/uv
+artifact_format: tar.gz
+
+# Optional: Limit distributions (default: all valid distributions from system.yaml)
+# debian_distributions:
+#   - bookworm
+#   - trixie
+
+# Optional: Limit architectures (default: all universal + restricted architectures)
+# Auto-discovery mode: Simply list architectures you want to build
+# architectures:
+#   - amd64
+#   - arm64
+
+# For uv, we build for all distributions and all architectures (using defaults)

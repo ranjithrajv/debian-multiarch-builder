@@ -1,6 +1,6 @@
-# Example configuration demonstrating distribution-specific architecture support
-# - i386: only supported in Debian Bookworm (deprecated in Trixie+)
-# - armel: supported in Bookworm and Trixie (last release, removed in Forky+)
+# Example configuration demonstrating user overrides for distribution-specific architecture support
+# NOTE: The action has built-in rules for i386, armel, and riscv64
+# This example shows how to override those rules if your upstream supports different distributions
 package_name: example-package
 github_repo: owner/repository
 artifact_format: tar.gz
@@ -27,18 +27,19 @@ architectures:
   i386:
     release_pattern: "example_{version}_i686.tar.gz"
 
-# Specify which architectures are supported for specific distributions
-distribution_arch_overrides:
-  # i386 is only supported in Bookworm (v12), deprecated in Trixie (v13+)
-  i386:
-    distributions:
-      - bookworm
-
-  # armel is supported in Bookworm and Trixie (last release), removed in Forky (v14+)
-  armel:
-    distributions:
-      - bookworm
-      - trixie
+# Optional: Override built-in distribution rules
+# The action automatically applies these rules (no config needed):
+#   - i386: Bookworm only
+#   - armel: Bookworm only
+#   - riscv64: Trixie+ only
+#
+# Only use distribution_arch_overrides if your upstream has different support
+# Example: if upstream still provides armel for Trixie:
+# distribution_arch_overrides:
+#   armel:
+#     distributions:
+#       - bookworm
+#       - trixie
 
 # Optional: If binary is in a subdirectory after extraction
 # binary_path: ""

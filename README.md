@@ -32,18 +32,20 @@ your-package-debian/
 │   ├── copyright                # Copyright information
 │   ├── changelog.Debian         # Changelog file
 │   └── README.md                # Optional documentation
-├── multiarch-config.yaml        # Multi-arch configuration
+├── package.yaml                 # Package configuration (required)
+├── overrides.yaml               # Optional build customizations
 └── Dockerfile                   # (Not needed - provided by action)
 ```
 
 ## Quick Start
 
-### 1. Create Configuration File
+### 1. Create Configuration Files
 
-Create a `multiarch-config.yaml` in your repository root:
+Create a `package.yaml` in your repository root:
 
 **Option A: Auto-discovery (Recommended)**
 ```yaml
+# package.yaml
 package_name: lazygit
 github_repo: jesseduffield/lazygit
 artifact_format: tar.gz
@@ -63,6 +65,7 @@ architectures:
 
 **Option B: Manual patterns (Advanced)**
 ```yaml
+# package.yaml
 package_name: lazygit
 github_repo: jesseduffield/lazygit
 artifact_format: tar.gz
@@ -81,6 +84,20 @@ architectures:
     release_pattern: "lazygit_{version}_Linux_arm64.tar.gz"
   armhf:
     release_pattern: "lazygit_{version}_Linux_armv7.tar.gz"
+```
+
+**Optional: Create `overrides.yaml` for customizations**
+```yaml
+# overrides.yaml (optional)
+# Customize build settings without modifying package.yaml
+
+parallel_builds:
+  architectures:
+    enabled: true
+    max_concurrent: 4  # Use more CPUs on self-hosted runners
+
+  distributions:
+    enabled: true
 ```
 
 ### 2. Create or Update Workflow
@@ -128,7 +145,7 @@ jobs:
       - name: Build packages
         uses: ranjithrajv/debian-multiarch-builder@v1
         with:
-          config-file: 'multiarch-config.yaml'
+          config-file: 'package.yaml'
           version: ${{ inputs.version }}
           build-version: ${{ inputs.build_version }}
           architecture: ${{ inputs.architecture }}
@@ -195,17 +212,20 @@ The action implements **two levels of parallelization** for maximum performance:
 ### Configuration
 
 ```yaml
-# Optional: customize parallel architecture build settings
-parallel_builds: true    # Default: true (enabled)
-max_parallel: 2          # Default: 2 (concurrent architecture builds)
+# Optional: customize parallel build settings
+parallel_builds:
+  architectures:
+    enabled: true        # Default: true
+    max_concurrent: 2    # Default: 2 (concurrent architecture builds)
+  distributions:
+    enabled: true        # Default: true (build distributions in parallel per arch)
 ```
 
-**Note:** Distribution parallelization is always enabled and cannot be disabled.
-
 **Recommendations:**
-- GitHub Actions standard runners: `max_parallel: 2` (2 CPU cores)
-- Self-hosted runners with 4+ cores: `max_parallel: 4`
-- Sequential architecture builds: Set `parallel_builds: false` (still builds distributions in parallel)
+- GitHub Actions standard runners: `max_concurrent: 2` (2 CPU cores)
+- Self-hosted runners with 4+ cores: `max_concurrent: 4`
+- Sequential architecture builds: Set `architectures.enabled: false`
+- Sequential distribution builds: Set `distributions.enabled: false` (slower but uses less resources)
 
 ### Performance Comparison
 
@@ -307,6 +327,15 @@ This feature provides automatic supply chain security without any configuration 
 
 ### Configuration File Structure
 
+The action uses a 4-layer configuration system:
+
+1. **`src/system.yaml`** - System constants (Debian policies, architecture patterns)
+2. **`src/defaults.yaml`** - Action defaults (parallel builds, auto-discovery settings)
+3. **`package.yaml`** - Your package definition (required)
+4. **`overrides.yaml`** - Your custom overrides (optional)
+
+#### package.yaml (Required)
+
 ```yaml
 # Package identification
 package_name: string           # Name of the Debian package
@@ -333,6 +362,13 @@ architectures:
   <debian-arch>:
     release_pattern: string    # Pattern with {version} placeholder
 
+# Optional: Path to binary within extracted archive
+binary_path: string            # Default: "" (binaries in root)
+```
+
+#### overrides.yaml (Optional)
+
+```yaml
 # Optional: Distribution-specific architecture support
 distribution_arch_overrides:
   <arch>:
@@ -340,11 +376,25 @@ distribution_arch_overrides:
       - list of distributions supporting this arch
 
 # Optional: Parallel build configuration
-parallel_builds: boolean       # Default: true (enabled)
-max_parallel: number           # Default: 2 (concurrent builds)
+parallel_builds:
+  architectures:
+    enabled: boolean           # Default: true
+    max_concurrent: number     # Default: 2
+  distributions:
+    enabled: boolean           # Default: true
 
-# Optional: Path to binary within extracted archive
-binary_path: string            # Default: "" (binaries in root)
+# Optional: Auto-discovery preferences
+auto_discovery:
+  exclude_patterns: [...]
+  build_preferences: [...]
+
+# Optional: Checksum verification patterns
+checksum:
+  file_patterns: [...]
+  generic_patterns: [...]
+
+# Optional: GitHub API endpoint (for GitHub Enterprise)
+github_api_base_url: string    # Default: "https://api.github.com"
 ```
 
 ### Architecture Naming
@@ -355,21 +405,38 @@ Map Debian architecture names to upstream release artifact patterns:
 |-------------|----------------------|-------|
 | amd64       | x86_64, amd64 | All distributions |
 | arm64       | aarch64, arm64 | All distributions |
-| armel       | arm, armeabi | Bookworm and Trixie only (last release) |
+| armel       | arm, armeabi | Bookworm only (auto-applied) |
 | armhf       | armv7, armhf, arm-gnueabihf | All distributions |
-| i386        | i386, i686, x86 | Bookworm only |
+| i386        | i386, i686, x86 | Bookworm only (auto-applied) |
 | ppc64el     | powerpc64le, ppc64le | All distributions |
 | s390x       | s390x | All distributions |
-| riscv64     | riscv64, riscv64gc | Trixie+ only |
+| riscv64     | riscv64, riscv64gc | Trixie+ only (auto-applied) |
+
+### Built-in Distribution Rules
+
+The action automatically applies Debian's official architecture support policies:
+
+- **i386**: Bookworm only (deprecated in Trixie v13+)
+- **armel**: Bookworm only (last version as regular architecture)
+- **riscv64**: Trixie+ only (introduced in Trixie v13)
+
+These rules are applied automatically—no configuration needed. You can override them with `distribution_arch_overrides` if your upstream has different support.
 
 ## Examples
 
 See the `examples/` directory for complete configuration examples:
 
+**New split configuration (recommended):**
+- `examples/lazygit-package.yaml` - Simple CLI tool with auto-discovery
+- `examples/eza-package.yaml` - Rust-based tool with manual patterns
+- `examples/uv-package.yaml` - Full multi-arch configuration
+- `examples/overrides.yaml` - Example optional overrides file
+
+**Legacy single-file configs (for reference):**
 - `examples/lazygit-config.yaml` - Simple CLI tool
 - `examples/eza-config.yaml` - Rust-based tool with musl builds
-- `examples/uv-config.yaml` - Full multi-arch with distribution overrides (riscv64 for Trixie+)
-- `examples/distribution-specific-arch-config.yaml` - Distribution-specific architectures (i386 for Bookworm, armel for Bookworm+Trixie)
+- `examples/uv-config.yaml` - Full multi-arch with distribution overrides
+- `examples/distribution-specific-arch-config.yaml` - How to override built-in distribution rules
 
 ## Action Inputs
 
@@ -424,7 +491,7 @@ The action automatically generates a `build-summary.json` file containing compre
 - name: Build packages
   uses: ranjithrajv/debian-multiarch-builder@v1
   with:
-    config-file: 'multiarch-config.yaml'
+    config-file: 'package.yaml'
     version: ${{ inputs.version }}
     build-version: ${{ inputs.build_version }}
 
@@ -450,10 +517,26 @@ src/
 │   ├── build.sh          # Core build functions
 │   ├── orchestration.sh  # Build orchestration (parallel and sequential)
 │   └── summary.sh        # Build summary generation
+├── system.yaml           # System constants and Debian official policies
+├── defaults.yaml         # User-configurable default settings
 ├── main.sh               # Main entry point
 └── Dockerfile            # Docker build template
 build.sh                  # Wrapper for backward compatibility
 ```
+
+### Configuration Files
+
+- **`src/system.yaml`** - System constants that rarely change:
+  - Debian distribution details (bookworm, trixie, forky, sid)
+  - Official architecture support policies
+  - Architecture pattern mappings
+  - Only updated when Debian releases new versions
+
+- **`src/defaults.yaml`** - User-configurable defaults:
+  - Build settings (parallel builds, max concurrent, etc.)
+  - Auto-discovery preferences
+  - Checksum verification patterns
+  - Users can override these in their `multiarch-config.yaml`
 
 Each module has a focused responsibility, making the codebase easier to understand, test, and extend.
 
