@@ -10,35 +10,28 @@ debian_distributions:
   - forky
   - sid
 
-# Architecture mappings
-# {version} will be replaced with the actual version number
+# Auto-discovery mode: Simply list architectures
+# Release patterns are automatically discovered from GitHub releases
 architectures:
-  amd64:
-    release_pattern: "uv-x86_64-unknown-linux-musl.tar.gz"
-
-  arm64:
-    release_pattern: "uv-aarch64-unknown-linux-musl.tar.gz"
-
-  armel:
-    release_pattern: "uv-arm-unknown-linux-musleabihf.tar.gz"
-
-  armhf:
-    release_pattern: "uv-armv7-unknown-linux-musleabihf.tar.gz"
-
-  ppc64el:
-    release_pattern: "uv-powerpc64le-unknown-linux-gnu.tar.gz"
-
-  s390x:
-    release_pattern: "uv-s390x-unknown-linux-gnu.tar.gz"
-
-  riscv64:
-    release_pattern: "uv-riscv64gc-unknown-linux-gnu.tar.gz"
+  - amd64
+  - arm64
+  - armel
+  - armhf
+  - ppc64el
+  - s390x
+  - riscv64
 
 # Specify which architectures are supported for specific distributions
-# riscv64 is only supported in Trixie (v13) and later, not in Bookworm (v12)
 distribution_arch_overrides:
+  # riscv64 is only supported in Trixie (v13) and later, not in Bookworm (v12)
   riscv64:
     distributions:
       - trixie
       - forky
       - sid
+
+  # armel is supported in Bookworm and Trixie only (last release)
+  armel:
+    distributions:
+      - bookworm
+      - trixie

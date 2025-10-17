@@ -125,35 +125,146 @@ if [ "$ARCH_COUNT" = "0" ] || [ "$ARCH_COUNT" = "null" ]; then
     error "No architectures defined in $CONFIG_FILE"
 fi
 
+# Detect architecture configuration mode (list vs object)
+ARCH_TYPE=$(yq eval '.architectures | type' "$CONFIG_FILE")
+if [ "$ARCH_TYPE" = "!!seq" ]; then
+    AUTO_DISCOVERY=true
+    info "Auto-discovery mode enabled (architectures specified as list)"
+elif [ "$ARCH_TYPE" = "!!map" ]; then
+    AUTO_DISCOVERY=false
+    info "Manual mode (architectures with release_pattern)"
+else
+    error "Invalid architectures format in $CONFIG_FILE (must be list or object)"
+fi
+
 info "Building $PACKAGE_NAME version $VERSION"
 info "GitHub repo: $GITHUB_REPO"
 info "Distributions: $DISTRIBUTIONS"
 info "Architectures defined: $ARCH_COUNT"
 echo ""
 
-# Function to get release pattern for an architecture
-get_release_pattern() {
-    local arch=$1
-    local pattern=$(yq eval ".architectures.${arch}.release_pattern" "$CONFIG_FILE")
+# Architecture pattern mappings for auto-discovery
+# Maps Debian arch to common upstream naming patterns
+declare -A ARCH_PATTERNS=(
+    ["amd64"]="x86_64|amd64|x64"
+    ["arm64"]="aarch64|arm64"
+    ["armel"]="arm-|armeabi"
+    ["armhf"]="armv7|armhf|arm-.*gnueabihf"
+    ["i386"]="i686|i386|x86"
+    ["ppc64el"]="powerpc64le|ppc64le"
+    ["s390x"]="s390x"
+    ["riscv64"]="riscv64gc|riscv64"
+)
 
-    if [ "$pattern" = "null" ] || [ -z "$pattern" ]; then
+# Cache for GitHub API release assets
+RELEASE_ASSETS_CACHE=""
+
+# Function to fetch release assets from GitHub API
+fetch_release_assets() {
+    # Return cached result if available
+    if [ -n "$RELEASE_ASSETS_CACHE" ]; then
+        echo "$RELEASE_ASSETS_CACHE"
+        return 0
+    fi
+
+    local api_url="https://api.github.com/repos/${GITHUB_REPO}/releases/tags/${VERSION}"
+    info "Fetching release assets from GitHub API..."
+
+    local assets=$(curl -sL "$api_url" | jq -r '.assets[]? | .name' 2>/dev/null)
+
+    if [ -z "$assets" ]; then
+        error "Failed to fetch release assets from $api_url
+
+Possible reasons:
+  - Version '$VERSION' doesn't exist for $GITHUB_REPO
+  - GitHub API rate limit exceeded
+  - Network connectivity issues
+
+Please check: https://github.com/${GITHUB_REPO}/releases/tag/${VERSION}"
+    fi
+
+    # Cache the result
+    RELEASE_ASSETS_CACHE="$assets"
+    echo "$assets"
+}
+
+# Function to auto-discover release pattern for an architecture
+auto_discover_pattern() {
+    local arch=$1
+    local pattern="${ARCH_PATTERNS[$arch]}"
+
+    if [ -z "$pattern" ]; then
         return 1
     fi
 
-    # Validate pattern has {version} placeholder
-    if [[ ! "$pattern" =~ \{version\} ]]; then
-        warning "Release pattern for $arch doesn't contain {version} placeholder: $pattern"
+    # Fetch all release assets
+    local assets=$(fetch_release_assets)
+
+    # Filter assets by format and pattern, filter out checksums and source
+    local filtered_assets=$(echo "$assets" | \
+        grep -E "\.(${ARTIFACT_FORMAT}|tgz|tar\.gz|zip)$" | \
+        grep -v -i "sha256\|checksum\|source" | \
+        grep -iE "$pattern" | \
+        grep -i "linux")
+
+    # Prefer musl builds, then gnu builds, then any linux build
+    local matched_asset=$(echo "$filtered_assets" | grep -i "musl" | head -1)
+    if [ -z "$matched_asset" ]; then
+        matched_asset=$(echo "$filtered_assets" | grep -i "gnu" | head -1)
+    fi
+    if [ -z "$matched_asset" ]; then
+        matched_asset=$(echo "$filtered_assets" | head -1)
     fi
 
-    # Replace {version} placeholder with actual version
-    pattern="${pattern//\{version\}/$VERSION}"
-    echo "$pattern"
+    if [ -z "$matched_asset" ]; then
+        return 1
+    fi
+
+    echo "$matched_asset"
     return 0
+}
+
+# Function to get release pattern for an architecture
+get_release_pattern() {
+    local arch=$1
+
+    if [ "$AUTO_DISCOVERY" = "true" ]; then
+        # Auto-discovery mode
+        local pattern=$(auto_discover_pattern "$arch")
+        if [ $? -ne 0 ] || [ -z "$pattern" ]; then
+            return 1
+        fi
+        echo "$pattern"
+        return 0
+    else
+        # Manual mode
+        local pattern=$(yq eval ".architectures.${arch}.release_pattern" "$CONFIG_FILE")
+
+        if [ "$pattern" = "null" ] || [ -z "$pattern" ]; then
+            return 1
+        fi
+
+        # Validate pattern has {version} placeholder
+        if [[ ! "$pattern" =~ \{version\} ]]; then
+            warning "Release pattern for $arch doesn't contain {version} placeholder: $pattern"
+        fi
+
+        # Replace {version} placeholder with actual version
+        pattern="${pattern//\{version\}/$VERSION}"
+        echo "$pattern"
+        return 0
+    fi
 }
 
 # Function to get all supported architectures from config
 get_supported_architectures() {
-    yq eval '.architectures | keys | .[]' "$CONFIG_FILE"
+    if [ "$AUTO_DISCOVERY" = "true" ]; then
+        # List format: architectures are array items
+        yq eval '.architectures[]' "$CONFIG_FILE"
+    else
+        # Object format: architectures are keys
+        yq eval '.architectures | keys | .[]' "$CONFIG_FILE"
+    fi
 }
 
 # Function to check if architecture is supported for a distribution
