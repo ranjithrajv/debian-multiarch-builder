@@ -33,7 +33,12 @@ runs:
       shell: bash
       run: |
         sudo apt-get update
-        sudo apt-get install -y wget tar gzip yq
+        sudo apt-get install -y wget tar gzip
+
+        # Install mikefarah/yq (Go-based, not Python yq from apt)
+        YQ_VERSION="v4.48.1"
+        sudo wget -qO /usr/bin/yq "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64"
+        sudo chmod +x /usr/bin/yq
 
     - name: Validate configuration
       shell: bash
