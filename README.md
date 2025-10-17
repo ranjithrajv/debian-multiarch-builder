@@ -209,6 +209,10 @@ distribution_arch_overrides:
     distributions:
       - list of distributions supporting this arch
 
+# Optional: Parallel build configuration
+parallel_builds: boolean       # Default: true (enabled)
+max_parallel: number           # Default: 2 (concurrent builds)
+
 # Optional: Path to binary within extracted archive
 binary_path: string            # Default: "" (binaries in root)
 ```
@@ -252,42 +256,19 @@ See the `examples/` directory for complete configuration examples:
 |--------|-------------|
 | `packages` | Space-separated list of generated .deb files |
 
-## Migration Guide
+## Documentation
 
-### From Single-Arch Build
-
-If you have an existing single-architecture build setup:
-
-1. **Create config file** - Add `multiarch-config.yaml` with your current architecture
-2. **Update workflow** - Replace custom build step with this action
-3. **Add more architectures** - Add additional architecture mappings as needed
-4. **Update control files** - Replace hardcoded values with placeholders
-
-### Minimal Changes Required
-
-For each package repository, you only need to:
-1. Add `multiarch-config.yaml` (new file)
-2. Update `.github/workflows/release.yml` (modify existing)
-3. Update `output/DEBIAN/control` (add placeholders)
-
-Your `Dockerfile` and `build.sh` can be removed - the action provides these.
-
-## Advantages
-
-- **Centralized Maintenance**: Update build logic in one place, benefits all packages
-- **Consistency**: All packages use the same build process
-- **Easy Updates**: Add new architectures globally without touching individual repos
-- **Reduced Duplication**: No need to copy/paste build scripts across repos
-- **Version Control**: Pin action to specific version for stability
-- **Testing**: Test changes in action repo before deploying to production
+- **[Migration Guide](docs/MIGRATION.md)** - Migrating from single-arch to multi-arch builds
+- **[Usage Guide](docs/USAGE.md)** - Detailed usage instructions and examples
+- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
 
 ## Contributing
 
-Contributions welcome! Please:
-1. Fork this repository
-2. Create a feature branch
-3. Test with example configurations
-4. Submit a pull request
+Contributions welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on:
+- Reporting issues
+- Submitting changes
+- Development workflow
+- Testing requirements
 
 ## License
 
@@ -301,16 +282,9 @@ Based on the multi-architecture work in [uv-debian](https://github.com/dariogrif
 
 For use with packages hosted at [debian.griffo.io](https://debian.griffo.io) by [@dariogriffo](https://github.com/dariogriffo)
 
-## Troubleshooting
-
-See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for common issues and solutions.
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for release history and changes.
-
 ## Support
 
 - Report issues: [GitHub Issues](https://github.com/ranjithrajv/debian-multiarch-builder/issues)
 - Discussions: [GitHub Discussions](https://github.com/ranjithrajv/debian-multiarch-builder/discussions)
-- Documentation: Check README.md, USAGE.md, and TROUBLESHOOTING.md
+- Documentation: Check [docs/](docs/) directory for detailed guides
+- Changelog: See [CHANGELOG.md](CHANGELOG.md) for release history

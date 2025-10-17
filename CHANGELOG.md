@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Parallel builds support** - Build multiple architectures concurrently (40-60% faster)
+  - Configurable with `parallel_builds` and `max_parallel` settings
+  - Default: 2 concurrent builds
+- **i386 architecture support** - Added support for i386 (Bookworm only)
+- **armel lifecycle documentation** - Documented armel end-of-life (last release in Trixie)
+- **Documentation restructure** - Organized docs into `docs/` directory
+  - Created `docs/MIGRATION.md` for migration guides
+  - Moved `docs/USAGE.md` and `docs/TROUBLESHOOTING.md`
+- Distribution-specific architecture example configuration
 - Comprehensive error messages with helpful diagnostics
 - Color-coded output (errors in red, success in green, warnings in yellow, info in blue)
 - Pre-flight validation of all configuration requirements
@@ -27,12 +36,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Docker build failures with troubleshooting hints
 
 ### Changed
+- README.md now references docs in `docs/` directory
+- Architecture table includes distribution-specific notes
 - Improved help message with better formatting and examples
 - Enhanced logging throughout the build process
 - Better error context when downloads or extractions fail
 - Download progress now shown with wget --show-progress
 
 ### Fixed
+- **Critical:** Fixed sed replacement order bug in Dockerfile
+  - BUILD_VERSION and FULL_VERSION must be replaced before VERSION
+  - Prevents incorrect version string substitution
+- Fixed README.md optional file copy in Dockerfile
 - Better handling of missing binary paths in extracted archives
 - More robust error checking for all file operations
 

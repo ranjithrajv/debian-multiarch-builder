@@ -1,0 +1,97 @@
+name: Documentation Improvement
+description: Suggest improvements to documentation
+title: "[Docs]: "
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve our documentation!
+
+  - type: dropdown
+    id: doc_type
+    attributes:
+      label: Documentation Type
+      description: What type of documentation needs improvement?
+      options:
+        - README.md
+        - Migration Guide (docs/MIGRATION.md)
+        - Usage Guide (docs/USAGE.md)
+        - Troubleshooting (docs/TROUBLESHOOTING.md)
+        - Contributing Guidelines (CONTRIBUTING.md)
+        - Code comments
+        - Example configurations
+        - Changelog
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: issue
+    attributes:
+      label: What's Wrong or Missing?
+      description: Describe the documentation issue
+      placeholder: |
+        The documentation doesn't explain...
+        The example is unclear because...
+        Missing information about...
+    validations:
+      required: true
+
+  - type: textarea
+    id: location
+    attributes:
+      label: Location
+      description: Where in the documentation is this issue?
+      placeholder: |
+        File: README.md
+        Section: Configuration Reference
+        Line: ~200
+    validations:
+      required: false
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested Improvement
+      description: How should this be improved?
+      placeholder: |
+        Add an explanation of...
+        Include an example showing...
+        Clarify that...
+    validations:
+      required: true
+
+  - type: textarea
+    id: example
+    attributes:
+      label: Example or Draft
+      description: Provide example text or a draft if you have one
+      placeholder: |
+        Suggested text:
+        "To configure parallel builds, add the following..."
+    validations:
+      required: false
+
+  - type: dropdown
+    id: audience
+    attributes:
+      label: Target Audience
+      description: Who would benefit from this improvement?
+      options:
+        - New users
+        - Experienced users
+        - Contributors
+        - Package maintainers
+        - Everyone
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other context or screenshots
+      placeholder: Add any other context here
+    validations:
+      required: false
