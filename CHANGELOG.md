@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Modular code structure** - Reorganized codebase into src/ directory
+  - Split 854-line monolithic build.sh into 8 focused modules
+  - Each module under 200 lines with clear separation of concerns
+  - Modules: utils, config, github-api, discovery, validation, build, parallel, summary
+  - Improved code maintainability, testability, and extensibility
+  - Backward compatible wrapper at root build.sh
 - **Auto-discovery of release patterns** - Automatically discover release assets from GitHub
   - Simple list format for architectures (e.g., `architectures: [amd64, arm64]`)
   - Fetches release assets from GitHub API
