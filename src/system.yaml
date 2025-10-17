@@ -1,0 +1,99 @@
+# System Constants and Debian Official Policies
+# These are universal facts that rarely change
+# DO NOT modify unless Debian releases new versions or changes official policies
+
+metadata:
+  last_updated: "2025-01-17"
+  source: "https://wiki.debian.org/SupportedArchitectures"
+  note: "Update when new Debian versions are released"
+
+# Valid Debian distributions
+distributions:
+  valid:
+    - bookworm  # Debian 12 (stable)
+    - trixie    # Debian 13 (testing)
+    - forky     # Debian 14 (future)
+    - sid       # Debian unstable
+
+  details:
+    bookworm:
+      version: "12"
+      status: oldstable
+      release_date: "2023-06-10"
+      security_support_ends: "2026-06-10"
+      lts_support_ends: "2028-06-30"
+
+    trixie:
+      version: "13"
+      status: stable
+      release_date: "2025-08-09"
+      security_support_ends: "2028-08-09"
+      lts_support_ends: "2030-06-30"
+
+    forky:
+      version: "14"
+      status: testing
+      release_date: null  # Not yet released
+      security_support_ends: null
+      lts_support_ends: null
+
+    sid:
+      version: "unstable"
+      status: perpetual
+      release_date: null  # Rolling release
+      security_support_ends: null
+      lts_support_ends: null
+
+# Debian Architecture Support Matrix
+# Official Debian policies - applied automatically
+architecture_support:
+  # Universal architectures (all distributions)
+  universal:
+    - amd64
+    - arm64
+    - armhf
+    - ppc64el
+    - s390x
+
+  # Distribution-restricted architectures
+  restricted:
+    i386:
+      distributions:
+        - bookworm
+      reason: "Deprecated in Trixie (v13+)"
+      eol_date: "2026-06"
+
+    armel:
+      distributions:
+        - bookworm
+      reason: "Last version in Bookworm as regular architecture"
+      eol_date: "2026-06"
+      note: "May be available as ports architecture in Trixie+"
+
+    riscv64:
+      distributions:
+        - trixie
+        - forky
+        - sid
+      reason: "Introduced in Trixie (v13)"
+      note: "Not available in Bookworm"
+
+# Architecture naming patterns for auto-discovery
+# Maps Debian architectures to common upstream naming conventions
+# These are industry-standard patterns
+arch_patterns:
+  amd64: "x86_64|amd64|x64"
+  arm64: "aarch64|arm64"
+  armel: "arm-|armeabi"
+  armhf: "armv7|armhf|arm-.*gnueabihf"
+  i386: "i686|i386|x86"
+  ppc64el: "powerpc64le|ppc64le"
+  s390x: "s390x"
+  riscv64: "riscv64gc|riscv64"
+
+# Supported artifact formats
+# These are the archive formats the builder can extract
+supported_formats:
+  - tar.gz
+  - tgz
+  - zip

@@ -8,6 +8,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Smart defaults from system.yaml** - Distributions and architectures are now optional
+  - If not specified in package.yaml, automatically uses all valid Debian distributions and architectures
+  - Minimal config: just package_name, github_repo, and artifact_format required
+  - Users only specify what they want to limit, not the full list
+  - Significantly reduces configuration boilerplate
+- **Split configuration support** - Optional package.yaml + overrides.yaml structure
+  - `package.yaml`: Core package definition (what to build)
+  - `overrides.yaml`: Optional customizations (how to build - parallel settings, distribution overrides, etc.)
+  - Backward compatible with multiarch-config.yaml
+  - Clean separation of concerns for better maintainability
+- **YAML configuration files** - Extracted hardcoded values into maintainable configuration
+  - `src/system.yaml`: Debian official policies, architecture patterns, distribution details
+  - `src/defaults.yaml`: User-configurable default settings
+  - Separation of system constants vs user preferences
+  - Easy updates when Debian releases new versions
+  - No code changes needed for configuration updates
+- **Built-in Debian distribution rules** - Automatic architecture support policies
+  - i386: Bookworm only (deprecated in Trixie v13+)
+  - armel: Bookworm only (last version as regular architecture)
+  - riscv64: Trixie+ only (introduced in Trixie v13)
+  - Applied automatically without configuration
+  - User overrides still supported via distribution_arch_overrides
+  - Simplifies config files by removing universal Debian knowledge
+- **Configurable distribution parallelization** - Control parallel builds at distribution level
+  - Can now disable parallel distribution builds if needed
+  - Enabled by default for maximum performance
+  - Fine-grained control: parallel architectures + parallel distributions
 - **Modular code structure** - Reorganized codebase into src/ directory
   - Split 854-line monolithic build.sh into 8 focused modules
   - Each module under 200 lines with clear separation of concerns
@@ -41,7 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Easy parsing for automation, artifact upload, and release notes generation
   - Compatible with GitHub Actions and other CI/CD platforms
 - **i386 architecture support** - Added support for i386 (Bookworm only)
-- **armel lifecycle documentation** - Documented armel end-of-life (last release in Trixie)
+- **armel lifecycle documentation** - Documented armel end-of-life (last version in Bookworm as regular architecture)
 - **Documentation restructure** - Organized docs into `docs/` directory
   - Created `docs/MIGRATION.md` for migration guides
   - Moved `docs/USAGE.md` and `docs/TROUBLESHOOTING.md`

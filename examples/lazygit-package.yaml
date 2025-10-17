@@ -1,0 +1,21 @@
+# Package definition for lazygit
+# This file contains the core package configuration
+# Optional customizations should go in overrides.yaml
+
+package_name: lazygit
+github_repo: jesseduffield/lazygit
+artifact_format: tar.gz
+
+# Debian distributions to build for
+debian_distributions:
+  - bookworm
+  - trixie
+  - forky
+  - sid
+
+# Auto-discovery mode: Simply list architectures
+# Release patterns are automatically discovered from GitHub releases
+architectures:
+  - amd64
+  - arm64
+  - armhf

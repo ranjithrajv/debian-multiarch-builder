@@ -21,17 +21,9 @@ architectures:
   - s390x
   - riscv64
 
-# Specify which architectures are supported for specific distributions
-distribution_arch_overrides:
-  # riscv64 is only supported in Trixie (v13) and later, not in Bookworm (v12)
-  riscv64:
-    distributions:
-      - trixie
-      - forky
-      - sid
-
-  # armel is supported in Bookworm and Trixie only (last release)
-  armel:
-    distributions:
-      - bookworm
-      - trixie
+# Distribution-specific architecture support is handled automatically by the action
+# Built-in rules:
+#   - i386: Bookworm only (deprecated in Trixie+)
+#   - armel: Bookworm only (last version as regular architecture)
+#   - riscv64: Trixie+ only (introduced in Trixie)
+# You can override these with distribution_arch_overrides if needed

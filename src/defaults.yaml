@@ -1,0 +1,57 @@
+# User-Configurable Default Settings
+# These are sensible defaults that users commonly override
+# Override any of these in your project's multiarch-config.yaml
+
+# Default build settings
+artifact_format: tar.gz  # Default archive format
+binary_path: ""          # Empty means binaries in root of archive
+
+# Parallel build configuration
+parallel_builds:
+  # Build multiple architectures in parallel
+  architectures:
+    enabled: true
+    max_concurrent: 2    # Suitable for GitHub Actions (2 CPU cores)
+
+  # Build multiple distributions in parallel (per architecture)
+  distributions:
+    enabled: true        # Enabled by default for faster builds
+
+# Build orchestration
+polling_interval_seconds: 1  # How often to check for completed builds
+
+# Auto-discovery preferences
+auto_discovery:
+  # Exclude these patterns when filtering release assets
+  exclude_patterns:
+    - "sha256"
+    - "checksum"
+    - "source"
+
+  # Build type preference order (first match wins)
+  # Most users prefer gnu builds (native to Debian) over musl
+  build_preferences:
+    - "gnu"
+    - "musl"
+    - "linux"
+
+# Checksum verification
+checksum:
+  # Specific checksum file patterns (tried in order)
+  # {release_pattern} is replaced with actual filename
+  file_patterns:
+    - "{release_pattern}.sha256"
+    - "{release_pattern}.sha256sum"
+    - "SHA256SUMS"
+    - "checksums.txt"
+
+  # Generic patterns (fallback if specific not found)
+  generic_patterns:
+    - "sha256"
+    - "checksums"
+    - "sums"
+
+# GitHub API
+github_api_base_url: "https://api.github.com"
+# For GitHub Enterprise, override with:
+# github_api_base_url: "https://github.example.com/api/v3"
