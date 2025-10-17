@@ -12,7 +12,7 @@ source "$SCRIPT_DIR/lib/github-api.sh"
 source "$SCRIPT_DIR/lib/discovery.sh"
 source "$SCRIPT_DIR/lib/validation.sh"
 source "$SCRIPT_DIR/lib/build.sh"
-source "$SCRIPT_DIR/lib/parallel.sh"
+source "$SCRIPT_DIR/lib/orchestration.sh"
 source "$SCRIPT_DIR/lib/summary.sh"
 
 # Parse command-line arguments

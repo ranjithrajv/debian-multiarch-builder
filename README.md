@@ -448,7 +448,7 @@ src/
 │   ├── discovery.sh      # Architecture pattern discovery
 │   ├── validation.sh     # Release and checksum validation
 │   ├── build.sh          # Core build functions
-│   ├── parallel.sh       # Parallel build orchestration
+│   ├── orchestration.sh  # Build orchestration (parallel and sequential)
 │   └── summary.sh        # Build summary generation
 ├── main.sh               # Main entry point
 └── Dockerfile            # Docker build template
