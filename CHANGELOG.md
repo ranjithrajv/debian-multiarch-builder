@@ -24,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Download caching** - Download and extract once per architecture, reuse for all distributions
   - Eliminates redundant downloads (previously downloaded 4 times per architecture)
   - Significantly reduces bandwidth usage and build time
+- **Checksum verification** - Automatic SHA256 checksum verification for downloaded releases
+  - Auto-discovers checksum files from GitHub releases (sha256, SHA256SUMS, etc.)
+  - Verifies integrity of downloaded archives before extraction
+  - Fails build if checksum mismatch detected (prevents corrupted/tampered files)
+  - Gracefully handles missing checksums (optional verification)
 - **i386 architecture support** - Added support for i386 (Bookworm only)
 - **armel lifecycle documentation** - Documented armel end-of-life (last release in Trixie)
 - **Documentation restructure** - Organized docs into `docs/` directory

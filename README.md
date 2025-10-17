@@ -8,6 +8,7 @@ A reusable GitHub Action for building Debian packages across multiple architectu
 - Support for multiple Debian distributions: Bookworm, Trixie, Forky, Sid
 - **Multi-level parallelization** - 75-80% faster with parallel architecture + distribution builds
 - **Download caching** - Download once per architecture, reuse for all distributions
+- **Checksum verification** - Automatic SHA256 verification for download integrity and security
 - **Auto-discovery** - Automatically discover release patterns from GitHub releases
 - Configuration-driven approach using YAML
 - Distribution-specific architecture support (e.g., i386 for Bookworm only, riscv64 for Trixie+)
@@ -268,6 +269,38 @@ architectures:
   amd64:
     release_pattern: "uv-x86_64-unknown-linux-musl.tar.gz"  # Specific variant
 ```
+
+## Security
+
+### Checksum Verification
+
+The action automatically verifies SHA256 checksums for downloaded releases to ensure integrity and security:
+
+**How it works:**
+1. **Auto-discovers checksum files** from GitHub release assets
+2. **Supports common formats**: `*.sha256`, `*.sha256sum`, `SHA256SUMS`, `checksums.txt`
+3. **Verifies before extraction**: Prevents building from corrupted or tampered files
+4. **Fails on mismatch**: Build stops if checksum doesn't match
+5. **Graceful fallback**: Continues if no checksum file is available (with info message)
+
+**Example output:**
+```
+ℹ️  Found checksum file: SHA256SUMS
+ℹ️  Verifying checksum...
+✅ Checksum verified: uv-x86_64-unknown-linux-gnu.tar.gz
+```
+
+**Failure behavior:**
+```
+❌ ERROR: Checksum verification failed for uv-x86_64-unknown-linux-gnu.tar.gz
+
+Expected: abc123...
+Actual:   def456...
+
+The downloaded file may be corrupted or tampered with.
+```
+
+This feature provides automatic supply chain security without any configuration required.
 
 ## Configuration Reference
 
