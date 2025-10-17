@@ -60,12 +60,10 @@ runs:
         echo "Build Version: $BUILD_VERSION"
         echo "Architecture: $ARCHITECTURE"
 
-        # Copy build script from action to working directory
+        # Copy build infrastructure from action to working directory
+        cp -r "$ACTION_PATH/src" ./src
         cp "$ACTION_PATH/build.sh" ./build.sh
-        chmod +x ./build.sh
-
-        # Copy Dockerfile from action to working directory
-        cp "$ACTION_PATH/Dockerfile" ./Dockerfile
+        chmod +x ./build.sh ./src/main.sh ./src/lib/*.sh
 
         # Run the build
         ./build.sh "$CONFIG_FILE" "$VERSION" "$BUILD_VERSION" "$ARCHITECTURE"

@@ -435,6 +435,28 @@ The action automatically generates a `build-summary.json` file containing compre
     echo "Built $PACKAGE_COUNT packages in $BUILD_TIME seconds"
 ```
 
+## Project Structure
+
+The action code is organized into modular components for maintainability:
+
+```
+src/
+├── lib/
+│   ├── utils.sh          # Logging and output formatting
+│   ├── config.sh         # Configuration parsing and validation
+│   ├── github-api.sh     # GitHub API interactions
+│   ├── discovery.sh      # Architecture pattern discovery
+│   ├── validation.sh     # Release and checksum validation
+│   ├── build.sh          # Core build functions
+│   ├── parallel.sh       # Parallel build orchestration
+│   └── summary.sh        # Build summary generation
+├── main.sh               # Main entry point
+└── Dockerfile            # Docker build template
+build.sh                  # Wrapper for backward compatibility
+```
+
+Each module has a focused responsibility, making the codebase easier to understand, test, and extend.
+
 ## Documentation
 
 - **[Migration Guide](docs/MIGRATION.md)** - Migrating from single-arch to multi-arch builds
