@@ -210,8 +210,8 @@ The action can automatically discover release patterns from GitHub releases, eli
 
 1. **Fetches release assets** from GitHub API for the specified version
 2. **Matches assets** to architectures using common naming patterns
-3. **Prefers musl builds** when available (better compatibility)
-4. **Falls back to gnu builds** if musl not available
+3. **Prefers gnu builds** when available (native to Debian, better performance)
+4. **Falls back to musl builds** if gnu not available
 
 ### Supported Pattern Matching
 
@@ -243,13 +243,13 @@ architectures:
   - arm64
   - armhf
 ```
-Discovers: `uv-x86_64-unknown-linux-musl.tar.gz`, `uv-aarch64-unknown-linux-musl.tar.gz`, etc.
+Discovers: `uv-x86_64-unknown-linux-gnu.tar.gz`, `uv-aarch64-unknown-linux-gnu.tar.gz`, etc.
 
 **Manual:**
 ```yaml
 architectures:
   amd64:
-    release_pattern: "uv-x86_64-unknown-linux-gnu.tar.gz"  # Specific variant
+    release_pattern: "uv-x86_64-unknown-linux-musl.tar.gz"  # Specific variant
 ```
 
 ## Configuration Reference

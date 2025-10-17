@@ -207,10 +207,10 @@ auto_discover_pattern() {
         grep -iE "$pattern" | \
         grep -i "linux")
 
-    # Prefer musl builds, then gnu builds, then any linux build
-    local matched_asset=$(echo "$filtered_assets" | grep -i "musl" | head -1)
+    # Prefer gnu builds (better for Debian), then musl builds, then any linux build
+    local matched_asset=$(echo "$filtered_assets" | grep -i "gnu" | head -1)
     if [ -z "$matched_asset" ]; then
-        matched_asset=$(echo "$filtered_assets" | grep -i "gnu" | head -1)
+        matched_asset=$(echo "$filtered_assets" | grep -i "musl" | head -1)
     fi
     if [ -z "$matched_asset" ]; then
         matched_asset=$(echo "$filtered_assets" | head -1)

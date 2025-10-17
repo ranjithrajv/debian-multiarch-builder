@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Simple list format for architectures (e.g., `architectures: [amd64, arm64]`)
   - Fetches release assets from GitHub API
   - Smart pattern matching for common architecture names
-  - Prefers musl builds over gnu for better compatibility
+  - Prefers gnu builds over musl (native to Debian, better performance)
   - Backward compatible with manual `release_pattern` configuration
   - Significantly reduces configuration complexity
 - **Parallel builds support** - Build multiple architectures concurrently (40-60% faster)
