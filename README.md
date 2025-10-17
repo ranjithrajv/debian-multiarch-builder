@@ -4,12 +4,12 @@ A reusable GitHub Action for building Debian packages across multiple architectu
 
 ## Features
 
-- Build Debian packages for multiple architectures: amd64, arm64, armel, armhf, ppc64el, s390x, riscv64
+- Build Debian packages for multiple architectures: amd64, arm64, armel, armhf, i386, ppc64el, s390x, riscv64
 - Support for multiple Debian distributions: Bookworm, Trixie, Forky, Sid
 - **Parallel builds by default** - 40-60% faster than sequential builds
 - Configuration-driven approach using YAML
 - Automatic download and extraction of upstream releases
-- Distribution-specific architecture support (e.g., riscv64 only on newer distributions)
+- Distribution-specific architecture support (e.g., i386 for Bookworm only, riscv64 for Trixie+)
 - Docker-based builds for reproducibility
 - Single command to build all architectures or specific ones
 - Comprehensive error messages with troubleshooting hints
@@ -87,6 +87,7 @@ on:
           - 'arm64'
           - 'armel'
           - 'armhf'
+          - 'i386'
           - 'ppc64el'
           - 's390x'
           - 'riscv64'
@@ -216,15 +217,16 @@ binary_path: string            # Default: "" (binaries in root)
 
 Map Debian architecture names to upstream release artifact patterns:
 
-| Debian Arch | Common Upstream Names |
-|-------------|----------------------|
-| amd64       | x86_64, amd64 |
-| arm64       | aarch64, arm64 |
-| armel       | arm, armeabi |
-| armhf       | armv7, armhf, arm-gnueabihf |
-| ppc64el     | powerpc64le, ppc64le |
-| s390x       | s390x |
-| riscv64     | riscv64, riscv64gc |
+| Debian Arch | Common Upstream Names | Notes |
+|-------------|----------------------|-------|
+| amd64       | x86_64, amd64 | All distributions |
+| arm64       | aarch64, arm64 | All distributions |
+| armel       | arm, armeabi | Bookworm and Trixie only (last release) |
+| armhf       | armv7, armhf, arm-gnueabihf | All distributions |
+| i386        | i386, i686, x86 | Bookworm only |
+| ppc64el     | powerpc64le, ppc64le | All distributions |
+| s390x       | s390x | All distributions |
+| riscv64     | riscv64, riscv64gc | Trixie+ only |
 
 ## Examples
 
@@ -232,7 +234,8 @@ See the `examples/` directory for complete configuration examples:
 
 - `examples/lazygit-config.yaml` - Simple CLI tool
 - `examples/eza-config.yaml` - Rust-based tool with musl builds
-- `examples/uv-config.yaml` - Full multi-arch with distribution overrides
+- `examples/uv-config.yaml` - Full multi-arch with distribution overrides (riscv64 for Trixie+)
+- `examples/distribution-specific-arch-config.yaml` - Distribution-specific architectures (i386 for Bookworm, armel for Bookworm+Trixie)
 
 ## Action Inputs
 

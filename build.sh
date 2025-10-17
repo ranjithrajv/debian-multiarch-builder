@@ -46,7 +46,7 @@ if [ -z "$CONFIG_FILE" ] || [ -z "$VERSION" ] || [ -z "$BUILD_VERSION" ]; then
     echo "  $0 config.yaml 2.35.0 1 arm64    # Build for arm64 only"
     echo "  $0 config.yaml 2.35.0 1 all      # Build for all architectures"
     echo ""
-    echo "Supported architectures: amd64, arm64, armel, armhf, ppc64el, s390x, riscv64"
+    echo "Supported architectures: amd64, arm64, armel, armhf, i386, ppc64el, s390x, riscv64"
     exit 1
 fi
 
