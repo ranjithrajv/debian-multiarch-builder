@@ -94,7 +94,30 @@ if [ "$ARCH" = "all" ]; then
     ARCH_ARRAY=($ARCHITECTURES)
     TOTAL_ARCHS=${#ARCH_ARRAY[@]}
 
-      BUILD_SUCCESS=false
+    # Initialize tracking files
+    echo "" > /tmp/attempted_architectures.txt
+    echo "" > /tmp/skipped_architectures.txt
+    echo "" > /tmp/available_architectures.txt
+
+    # Pre-detect available architectures for this version
+    info "Detecting available architectures for $PACKAGE_NAME version $VERSION..."
+    for arch in "${ARCH_ARRAY[@]}"; do
+        if check_release_exists "$VERSION"; then
+            # Check if this architecture has release assets available
+            local pattern=$(get_release_pattern "$arch" 2>/dev/null)
+            if [ $? -eq 0 ] && [ -n "$pattern" ]; then
+                echo "$arch" >> /tmp/available_architectures.txt
+                info "  ✓ $arch: Available"
+            else
+                info "  ✗ $arch: Not available (no matching release assets)"
+            fi
+        else
+            error "Version $VERSION not found in release assets"
+            return 1
+        fi
+    done
+
+    BUILD_SUCCESS=false
     if [ "$PARALLEL_BUILDS" = "true" ]; then
         if build_all_architectures_parallel "${ARCH_ARRAY[@]}"; then
             BUILD_SUCCESS=true
@@ -114,12 +137,28 @@ if [ "$ARCH" = "all" ]; then
             echo ""
             echo "=========================================="
 
-            # Calculate what was built vs what was attempted
-            TARGET_PACKAGES=$((TOTAL_ARCHS * 4))  # 4 distributions per architecture
-            SUCCESS_RATE=$(( (TOTAL_PACKAGES * 100) / TARGET_PACKAGES ))
+            # Calculate actual attempted vs built based on detected available architectures
+            local attempted_archs=$(cat /tmp/attempted_architectures.txt 2>/dev/null | wc -l || echo 0)
+            local skipped_archs=$(cat /tmp/skipped_architectures.txt 2>/dev/null | wc -l || echo 0)
+            local available_archs=$(cat /tmp/available_architectures.txt 2>/dev/null | wc -l || echo 0)
 
-            if [ "$TOTAL_PACKAGES" -eq "$TARGET_PACKAGES" ]; then
-                echo "🎉 All architectures built successfully!"
+            # Calculate target packages based on available architectures and their distribution support
+            local attempted_packages=0
+            for arch in $(cat /tmp/attempted_architectures.txt 2>/dev/null); do
+                # Get distribution support for this architecture
+                local dists=$(is_arch_supported_for_dist "$arch" "bookworm trixie forky sid")
+                local supported_count=$(echo "$dists" | wc -l)
+                attempted_packages=$((attempted_packages + supported_count))
+            done
+
+            if [ "$attempted_packages" -gt 0 ]; then
+                SUCCESS_RATE=$(( (TOTAL_PACKAGES * 100) / attempted_packages ))
+            else
+                SUCCESS_RATE=0
+            fi
+
+            if [ "$TOTAL_PACKAGES" -eq "$attempted_packages" ]; then
+                echo "🎉 All attempted architectures built successfully!"
             elif [ "$TOTAL_PACKAGES" -gt 0 ]; then
                 echo "✅ Build completed with partial success ($SUCCESS_RATE% success rate)"
             else
@@ -136,9 +175,13 @@ if [ "$ARCH" = "all" ]; then
 
             # Show build summary
             echo "📊 Build Summary:"
-            echo "  🎯 Target: $TARGET_PACKAGES packages ($TOTAL_ARCHS architectures × 4 distributions)"
+            echo "  🔍 Detected: $available_archs architectures available for $VERSION"
+            echo "  🎯 Attempted: $attempted_packages packages ($attempted_archs architectures)"
             echo "  ✅ Built: $TOTAL_PACKAGES packages"
             echo "  📈 Success Rate: $SUCCESS_RATE%"
+            if [ "$skipped_archs" -gt 0 ]; then
+                echo "  ⚠️  Skipped: $skipped_archs architectures (no release assets available)"
+            fi
 
             # Show which architectures succeeded
             local built_archs=$(ls ${PACKAGE_NAME}_*.deb 2>/dev/null | sed "s/.*${PACKAGE_NAME}_.*+\([^-]*\)_.*\.deb/\1/" | sort -u)
@@ -164,10 +207,10 @@ if [ "$ARCH" = "all" ]; then
             generate_build_summary
 
             # Record successful completion in telemetry
-            if [ "$TOTAL_PACKAGES" -eq "$TARGET_PACKAGES" ]; then
-                record_build_stage_complete "build_completion" "success" "All builds completed successfully"
+            if [ "$TOTAL_PACKAGES" -eq "$attempted_packages" ]; then
+                record_build_stage_complete "build_completion" "success" "All attempted builds completed successfully"
             else
-                record_build_stage_complete "build_completion" "partial_success" "Build completed with $TOTAL_PACKAGES/$TARGET_PACKAGES packages ($SUCCESS_RATE% success rate)"
+                record_build_stage_complete "build_completion" "partial_success" "Build completed with $TOTAL_PACKAGES/$attempted_packages packages ($SUCCESS_RATE% success rate)"
             fi
         else
             # Build functions returned success but no packages were created

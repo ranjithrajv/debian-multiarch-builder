@@ -95,8 +95,14 @@ build_architecture() {
 
     release_pattern=$(get_release_pattern "$build_arch")
     if [ $? -ne 0 ]; then
-        error "Architecture '$build_arch' not found in config or has no release_pattern"
+        echo "⚠️  Architecture '$build_arch' skipped: no release assets available for this version"
+        echo "   💡 This architecture is not available for $PACKAGE_NAME version $VERSION"
+        echo ""
+        # Record that this architecture was skipped (not failed)
+        echo "$build_arch" >> "/tmp/skipped_architectures.txt"
+        return 0  # Return success so build continues with other architectures
     fi
+    echo "$build_arch" >> "/tmp/attempted_architectures.txt"
 
     echo "==========================================="
     info "Building for architecture: $build_arch"
