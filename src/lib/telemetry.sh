@@ -407,12 +407,19 @@ update_final_telemetry_data() {
     fi
 
     if command -v yq >/dev/null 2>&1; then
-        yq eval ".build_session.start_time = $(date -d "@$BUILD_START_TIME" -Iseconds)" -i "$TELEMETRY_DATA_FILE"
-        yq eval ".build_session.end_time = $(date -d "@$BUILD_END_TIME" -Iseconds)" -i "$TELEMETRY_DATA_FILE"
-        yq eval ".build_session.duration_seconds = $build_duration" -i "$TELEMETRY_DATA_FILE"
-        yq eval ".memory_metrics.peak_usage_mb = $PEAK_MEMORY_USAGE" -i "$TELEMETRY_DATA_FILE"
-        yq eval ".network_metrics.bytes_downloaded = $NETWORK_BYTES_DOWNLOADED" -i "$TELEMETRY_DATA_FILE"
-        yq eval ".network_metrics.bytes_uploaded = $NETWORK_BYTES_UPLOADED" -i "$TELEMETRY_DATA_FILE"
+        # Use proper quoting for date values to avoid yq parsing issues
+        local start_time_iso=$(date -d "@$BUILD_START_TIME" -Iseconds)
+        local end_time_iso=$(date -d "@$BUILD_END_TIME" -Iseconds)
+
+        # Update telemetry with error handling
+        yq eval ".build_session.start_time = \"$start_time_iso\"" -i "$TELEMETRY_DATA_FILE" 2>/dev/null || echo "Warning: Failed to update start_time"
+        yq eval ".build_session.end_time = \"$end_time_iso\"" -i "$TELEMETRY_DATA_FILE" 2>/dev/null || echo "Warning: Failed to update end_time"
+        yq eval ".build_session.duration_seconds = $build_duration" -i "$TELEMETRY_DATA_FILE" 2>/dev/null || echo "Warning: Failed to update duration"
+        yq eval ".memory_metrics.peak_usage_mb = $PEAK_MEMORY_USAGE" -i "$TELEMETRY_DATA_FILE" 2>/dev/null || echo "Warning: Failed to update memory"
+        yq eval ".network_metrics.bytes_downloaded = $NETWORK_BYTES_DOWNLOADED" -i "$TELEMETRY_DATA_FILE" 2>/dev/null || echo "Warning: Failed to update download bytes"
+        yq eval ".network_metrics.bytes_uploaded = $NETWORK_BYTES_UPLOADED" -i "$TELEMETRY_DATA_FILE" 2>/dev/null || echo "Warning: Failed to update upload bytes"
+    else
+        echo "Warning: yq not available for telemetry updates"
     fi
 }
 
