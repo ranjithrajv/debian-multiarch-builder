@@ -1,6 +1,24 @@
 # Troubleshooting Guide
 
-Common issues and solutions when using debian-multiarch-builder.
+This guide provides solutions to common issues you may encounter when using the Debian Multi-Architecture Package Builder.
+
+## Common Errors
+
+### "Release not found"
+
+This error occurs when the action is unable to find the specified release artifact. Here are some common causes and solutions:
+
+*   **Incorrect version:** Make sure that the `version` you specified in your workflow exists as a release tag in the upstream repository.
+*   **Incorrect release pattern:** If you are not using auto-discovery, make sure that the `release_pattern` in your `package.yaml` file is correct. You can check the release assets on the GitHub releases page to find the correct pattern.
+*   **Architecture not published:** The upstream project may not publish release artifacts for the architecture you are trying to build for.
+
+### "Checksum verification failed"
+
+This error occurs when the checksum of the downloaded release artifact does not match the expected checksum. This could be due to a corrupted download or a tampered file. You can try re-running the workflow to see if the error persists. If it does, you should contact the maintainer of the upstream project to report the issue.
+
+### "Binary source not found"
+
+This error occurs when the action is unable to find the binary in the extracted release artifact. This is usually because the binary is not in the root of the archive. You can use the `binary_path` option in your `package.yaml` file to specify the path to the binary within the archive.
 
 ## Configuration Errors
 

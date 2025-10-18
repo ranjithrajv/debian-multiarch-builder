@@ -2,11 +2,25 @@
 
 This guide provides the steps to get started with the Debian Multi-Architecture Package Builder action.
 
-## 1. Create Configuration Files
+### 1. Create Configuration Files
 
 Create a `package.yaml` in your repository root:
 
-**Option A: Auto-discovery (Recommended)**
+**Option A: Minimal Configuration (Recommended)**
+
+This is the simplest way to get started. The action will automatically build for all supported distributions and architectures.
+
+```yaml
+# package.yaml
+package_name: lazygit
+github_repo: jesseduffield/lazygit
+artifact_format: tar.gz
+```
+
+**Option B: Auto-discovery**
+
+This option allows you to specify the distributions and architectures you want to build for.
+
 ```yaml
 # package.yaml
 package_name: lazygit
@@ -16,38 +30,13 @@ artifact_format: tar.gz
 debian_distributions:
   - bookworm
   - trixie
-  - forky
-  - sid
 
-# Simple list - release patterns auto-discovered from GitHub
 architectures:
   - amd64
   - arm64
-  - armhf
 ```
 
-**Option B: Manual patterns (Advanced)**
-```yaml
-# package.yaml
-package_name: lazygit
-github_repo: jesseduffield/lazygit
-artifact_format: tar.gz
-
-debian_distributions:
-  - bookworm
-  - trixie
-  - forky
-  - sid
-
-# Explicit patterns for full control
-architectures:
-  amd64:
-    release_pattern: "lazygit_{version}_Linux_x86_64.tar.gz"
-  arm64:
-    release_pattern: "lazygit_{version}_Linux_arm64.tar.gz"
-  armhf:
-    release_pattern: "lazygit_{version}_Linux_armv7.tar.gz"
-```
+**Option C: Manual Patterns (Advanced)**
 
 **Optional: Create `overrides.yaml` for customizations**
 ```yaml
