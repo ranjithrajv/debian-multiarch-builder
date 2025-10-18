@@ -72,9 +72,11 @@ build_all_architectures_parallel() {
         for i in "${!pids[@]}"; do
             pid=${pids[$i]}
             if ! kill -0 $pid 2>/dev/null; then
-                # Build completed
+                # Build completed - capture exit code before it's lost
+                set +e  # Temporarily disable exit-on-error
                 wait $pid
                 exit_code=$?
+                set -e  # Re-enable exit-on-error
 
                 arch=${active_archs[$i]}
                 if [ $exit_code -eq 0 ]; then
