@@ -81,6 +81,12 @@ build_all_architectures_parallel() {
                     echo "✅ Completed build for $arch"
                 else
                     echo "❌ Failed build for $arch"
+                    # Print log immediately to help with debugging
+                    if [ -f "build_${arch}.log" ]; then
+                        echo "==== Build log for $arch ===="
+                        cat "build_${arch}.log"
+                        echo "==== End of log ===="
+                    fi
                 fi
 
                 # Remove from active arrays
