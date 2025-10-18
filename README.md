@@ -11,6 +11,8 @@ A reusable GitHub Action for building Debian packages across multiple architectu
 - **Checksum verification** - Automatic SHA256 verification for download integrity and security
 - **Auto-discovery** - Automatically discover release patterns from GitHub releases
 - **Build summary JSON** - Automatic metadata export for CI/CD integration and automation
+- **Real-time progress tracking** - Per-architecture build timing, progress indicators, and running status
+- **Enhanced observability** - Clear error summaries, artifact sizes, and build metrics
 - Configuration-driven approach using YAML
 - Distribution-specific architecture support (e.g., i386 for Bookworm only, riscv64 for Trixie+)
 - Docker-based builds for reproducibility
@@ -149,6 +151,7 @@ jobs:
           version: ${{ inputs.version }}
           build-version: ${{ inputs.build_version }}
           architecture: ${{ inputs.architecture }}
+          max-parallel: '2'  # Optional: control concurrent builds (default: 2)
 
       - uses: actions/upload-artifact@v4
         with:
@@ -323,6 +326,102 @@ The downloaded file may be corrupted or tampered with.
 
 This feature provides automatic supply chain security without any configuration required.
 
+## Build Output & Observability
+
+The action provides detailed real-time feedback during builds with enhanced observability features:
+
+### Per-Architecture Build Timing
+
+Each architecture build displays its duration, helping identify slow builds:
+
+```
+🔨 Starting build for amd64 (0/8)...
+🔨 Starting build for arm64 (1/8)...
+✅ Completed build for amd64 (1m36s) [1/8]
+✅ Completed build for arm64 (1m37s) [2/8]
+✅ Completed build for armhf (1m30s) [3/8]
+```
+
+**Benefits:**
+- Identify slow architectures for optimization
+- Track performance changes over time
+- Debug build performance issues
+
+### Progress Indicators
+
+Real-time progress tracking shows completion status and running builds:
+
+```
+✅ Completed build for s390x (57s) [5/8]
+🔨 Starting build for armel (7/8)...
+   ⚡ Running: i386 armel
+```
+
+**Features:**
+- `[5/8]` - Shows completed/total ratio
+- `⚡ Running: i386 armel` - Lists currently building architectures
+- Clear visibility into build pipeline status
+
+### Enhanced Error Summaries
+
+Clean, actionable error messages instead of verbose log dumps:
+
+```
+==========================================
+❌ Build Summary: 2 failed, 6 succeeded
+==========================================
+
+Failed architectures:
+  • ppc64el
+  • s390x
+```
+
+**Improvements:**
+- Clear success/failure counts
+- List of failed architectures
+- Actionable information without log noise
+
+### Artifact Size Tracking
+
+Total package size displayed at build completion:
+
+```
+✅ Build summary saved to build-summary.json
+   📦 Total artifact size: 315 MB (25 packages)
+```
+
+**Use cases:**
+- Monitor package size growth
+- Verify expected package sizes
+- Track storage requirements
+
+### Example Build Output
+
+Complete example of enhanced build output:
+
+```
+⚡ Parallel builds enabled (max: 2 concurrent)
+
+🔨 Starting build for amd64 (0/8)...
+🔨 Starting build for arm64 (1/8)...
+✅ Completed build for amd64 (1m36s) [1/8]
+🔨 Starting build for armhf (3/8)...
+   ⚡ Running: arm64 armhf
+✅ Completed build for arm64 (1m37s) [2/8]
+🔨 Starting build for ppc64el (4/8)...
+   ⚡ Running: armhf ppc64el
+✅ Completed build for armhf (1m30s) [3/8]
+✅ Completed build for ppc64el (1m29s) [4/8]
+✅ Completed build for s390x (57s) [5/8]
+✅ Completed build for i386 (56s) [6/8]
+✅ Completed build for armel (40s) [7/8]
+✅ Completed build for riscv64 (39s) [8/8]
+
+✅ Total: 25 packages
+✅ Build summary saved to build-summary.json
+   📦 Total artifact size: 315 MB (25 packages)
+```
+
 ## Configuration Reference
 
 ### Configuration File Structure
@@ -446,6 +545,13 @@ See the `examples/` directory for complete configuration examples:
 | `version` | Version of software to build | Yes | - |
 | `build-version` | Debian build version number | Yes | - |
 | `architecture` | Architecture to build or "all" | No | `all` |
+| `max-parallel` | Maximum concurrent builds (2-4 recommended) | No | `2` |
+
+**Notes:**
+- `max-parallel`: Controls concurrent architecture builds. Environment variable takes precedence over YAML config.
+  - GitHub Actions runners: `2` (2 CPU cores)
+  - Self-hosted 4+ core runners: `4`
+  - Higher values require more CPU/memory resources
 
 ## Action Outputs
 
@@ -468,6 +574,8 @@ The action automatically generates a `build-summary.json` file containing compre
   "architectures": ["amd64", "arm64", "armhf"],
   "distributions": ["bookworm", "trixie", "forky", "sid"],
   "total_packages": 12,
+  "total_size_bytes": 330301440,
+  "total_size_human": "315 MB",
   "build_duration_seconds": 420,
   "build_start": "2025-10-17T10:30:00+0530",
   "build_end": "2025-10-17T10:37:00+0530",
@@ -479,6 +587,10 @@ The action automatically generates a `build-summary.json` file containing compre
   ]
 }
 ```
+
+**New fields:**
+- `total_size_bytes`: Total size of all packages in bytes
+- `total_size_human`: Human-readable total size (e.g., "315 MB")
 
 **Use cases:**
 - **Automated artifact upload** - Parse package list for upload to apt repositories
