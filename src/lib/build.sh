@@ -10,6 +10,9 @@ build_distribution() {
 
     FULL_VERSION="${VERSION}-${BUILD_VERSION}+${dist}_${build_arch}"
 
+    # Enhanced Docker build with failure capture
+    local docker_build_log="/tmp/docker-build-${dist}-${build_arch}.log"
+
     if ! docker build . -t "${PACKAGE_NAME}-${dist}-${build_arch}" \
         -f "$SCRIPT_DIR/Dockerfile" \
         --build-arg DEBIAN_DIST="$dist" \
@@ -19,9 +22,51 @@ build_distribution() {
         --build-arg FULL_VERSION="$FULL_VERSION" \
         --build-arg ARCH="$build_arch" \
         --build-arg BINARY_SOURCE="$binary_source" \
-        --build-arg GITHUB_REPO="$GITHUB_REPO" 2>&1; then
+        --build-arg GITHUB_REPO="$GITHUB_REPO" 2>&1 | tee "$docker_build_log"; then
+
+        # Capture Docker build failure details for telemetry
+        local docker_error=$(tail -20 "$docker_build_log" | grep -E "(ERROR|error|Error|failed|Failed|FAILED)" | head -5 | tr '\n' '; ' | sed 's/; $//')
+        if [ -z "$docker_error" ]; then
+            docker_error="Docker build failed for ${dist}-${build_arch} - check build logs"
+        fi
+
+        # Record detailed failure in telemetry
+        record_build_failure "docker_build" "$docker_error" "1"
+
+        # Add context-specific failure details
+        add_failure_detail "Docker build failed for architecture: ${build_arch}, distribution: ${dist}"
+        add_failure_detail "Docker image target: ${PACKAGE_NAME}-${dist}-${build_arch}"
+
+        # Extract specific error patterns for better categorization
+        if echo "$docker_error" | grep -qi -E "(no such file|not found|file.*missing)"; then
+            add_failure_detail "Missing files or dependencies detected in Docker build"
+            record_build_failure "docker_build" "Missing files or dependencies in Docker build: $docker_error" "1"
+        elif echo "$docker_error" | grep -qi -E "(permission|denied|access)"; then
+            add_failure_detail "Permission error during Docker build"
+            record_build_failure "docker_build" "Permission error in Docker build: $docker_error" "1"
+        elif echo "$docker_error" | grep -qi -E "(memory|disk|space|resource)"; then
+            add_failure_detail "Resource constraint during Docker build"
+            record_build_failure "docker_build" "Resource constraint in Docker build: $docker_error" "1"
+        elif echo "$docker_error" | grep -qi -E "(network|connection|timeout|download)"; then
+            add_failure_detail "Network issue during Docker build"
+            record_build_failure "docker_build" "Network issue in Docker build: $docker_error" "1"
+        else
+            add_failure_detail "General Docker build failure"
+            record_build_failure "docker_build" "Docker build error: $docker_error" "1"
+        fi
+
+        # Add build environment details
+        add_failure_detail "Build environment: $(uname -a)"
+        add_failure_detail "Docker version: $(docker --version 2>/dev/null || echo 'Docker not available')"
+
+        # Clean up log file
+        rm -f "$docker_build_log" 2>/dev/null || true
+
         return 1
     fi
+
+    # Clean up successful build log
+    rm -f "$docker_build_log" 2>/dev/null || true
 
     id="$(docker create "${PACKAGE_NAME}-${dist}-${build_arch}")"
     if ! docker cp "$id:/${PACKAGE_NAME}_${FULL_VERSION}.deb" - > "./${PACKAGE_NAME}_${FULL_VERSION}.deb" 2>&1; then

@@ -70,9 +70,21 @@ init_telemetry() {
     "failure_category": "",
     "failure_stage": "",
     "failure_reason": "",
+    "failure_details": [],
+    "failure_code": 0,
     "packages_built": 0,
     "packages_failed": 0,
-    "build_stages": []
+    "build_stages": [],
+    "docker_info": {
+      "version": "",
+      "daemon_running": false,
+      "available_images": 0
+    },
+    "system_resources": {
+      "disk_space_before_gb": 0,
+      "disk_space_after_gb": 0,
+      "memory_available_mb": 0
+    }
   },
   "performance_metrics": {
     "regressions_detected": [],
@@ -86,7 +98,11 @@ EOF
     start_memory_monitoring
     start_network_monitoring
 
-    info "Telemetry system initialized"
+    # Collect Docker and system information for failure diagnosis
+    collect_docker_info
+    collect_system_resources
+
+    info "Telemetry system initialized with Docker and system info"
 }
 
 # Memory usage monitoring
@@ -241,32 +257,47 @@ categorize_failure() {
     local reason="$2"
     local code="$3"
 
+    # Docker-specific failures
+    if [ "$stage" = "docker_build" ]; then
+        if echo "$reason" | grep -qi -E "(no such file|not found|file.*missing|command.*not found)"; then
+            echo "docker_missing_files"
+        elif echo "$reason" | grep -qi -E "(permission|denied|access|cannot.*open)"; then
+            echo "docker_permission"
+        elif echo "$reason" | grep -qi -E "(memory|disk|space|resource|no space left)"; then
+            echo "docker_resource"
+        elif echo "$reason" | grep -qi -E "(network|connection|timeout|download|pull)"; then
+            echo "docker_network"
+        elif echo "$reason" | grep -qi -E "(dockerfile|syntax|invalid)"; then
+            echo "dockerfile_syntax"
+        else
+            echo "docker_general"
+        fi
     # Network-related failures
-    if echo "$reason" | grep -qi -E "(connection|timeout|network|download|curl|wget)"; then
+    elif echo "$reason" | grep -qi -E "(connection|timeout|network|download|curl|wget|404|not found)"; then
         echo "network"
     # Dependency-related failures
-    elif echo "$reason" | grep -qi -E "(dependency|apt|dpkg|install)"; then
+    elif echo "$reason" | grep -qi -E "(dependency|apt|dpkg|install|package.*not found)"; then
         echo "dependency"
     # Architecture-related failures
-    elif echo "$reason" | grep -qi -E "(architecture|cross|qemu|multiarch)"; then
+    elif echo "$reason" | grep -qi -E "(architecture|cross|qemu|multiarch|unsupported)"; then
         echo "architecture"
     # Build-related failures
-    elif echo "$reason" | grep -qi -E "(compile|build|make|cmake)"; then
+    elif echo "$reason" | grep -qi -E "(compile|build|make|cmake|error.*\d+:|gcc|clang)"; then
         echo "compilation"
     # Package-related failures
-    elif echo "$reason" | grep -qi -E "(package|deb|lintian|debian)"; then
+    elif echo "$reason" | grep -qi -E "(package|deb|lintian|debian|dpkg-deb)"; then
         echo "packaging"
     # Configuration-related failures
-    elif echo "$reason" | grep -qi -E "(config|yaml|setting|parameter)"; then
+    elif echo "$reason" | grep -qi -E "(config|yaml|setting|parameter|invalid.*argument)"; then
         echo "configuration"
     # Permission-related failures
-    elif echo "$reason" | grep -qi -E "(permission|denied|access|auth)"; then
+    elif echo "$reason" | grep -qi -E "(permission|denied|access|auth|cannot.*create)"; then
         echo "permission"
     # Resource-related failures
-    elif echo "$reason" | grep -qi -E "(memory|disk|space|resource)"; then
+    elif echo "$reason" | grep -qi -E "(memory|disk|space|resource|out of memory|oom)"; then
         echo "resource"
     # Checksum/security failures
-    elif echo "$reason" | grep -qi -E "(checksum|hash|security|verify)"; then
+    elif echo "$reason" | grep -qi -E "(checksum|hash|security|verify|gpg|signature)"; then
         echo "security"
     else
         echo "unknown"
@@ -309,6 +340,9 @@ finalize_telemetry() {
         NETWORK_BYTES_DOWNLOADED=$((final_rx - initial_rx))
         NETWORK_BYTES_UPLOADED=$((final_tx - initial_tx))
     fi
+
+    # Update final system resources
+    update_final_system_resources
 
     # Update final telemetry data
     update_final_telemetry_data
@@ -449,6 +483,72 @@ save_as_baseline() {
     info "Current build saved as performance baseline"
 }
 
+# Collect Docker information for failure diagnosis
+collect_docker_info() {
+    if [ "$TELEMETRY_ENABLED" != "true" ]; then
+        return 0
+    fi
+
+    local docker_version=""
+    local daemon_running=false
+    local available_images=0
+
+    if command -v docker >/dev/null 2>&1; then
+        docker_version=$(docker --version 2>/dev/null | awk '{print $3}' | sed 's/,//' || echo "unknown")
+
+        # Check if Docker daemon is running
+        if docker info >/dev/null 2>&1; then
+            daemon_running=true
+            available_images=$(docker images --format "table {{.Repository}}" | grep -v "REPOSITORY" | wc -l || echo "0")
+        fi
+    fi
+
+    # Update telemetry with Docker info
+    update_telemetry_field "build_metrics.docker_info.version" "\"$docker_version\""
+    update_telemetry_field "build_metrics.docker_info.daemon_running" "$daemon_running"
+    update_telemetry_field "build_metrics.docker_info.available_images" "$available_images"
+}
+
+# Collect system resources for failure diagnosis
+collect_system_resources() {
+    if [ "$TELEMETRY_ENABLED" != "true" ]; then
+        return 0
+    fi
+
+    local disk_space_before=$(df -BG . | tail -1 | awk '{print $4}' | sed 's/G//')
+    local memory_available=$(free -m | awk '/^Mem:/ {print $7}')
+
+    # Update telemetry with system resources
+    update_telemetry_field "build_metrics.system_resources.disk_space_before_gb" "$disk_space_before"
+    update_telemetry_field "build_metrics.system_resources.memory_available_mb" "$memory_available"
+}
+
+# Update final system resources after build
+update_final_system_resources() {
+    if [ "$TELEMETRY_ENABLED" != "true" ]; then
+        return 0
+    fi
+
+    local disk_space_after=$(df -BG . | tail -1 | awk '{print $4}' | sed 's/G//')
+    update_telemetry_field "build_metrics.system_resources.disk_space_after_gb" "$disk_space_after"
+}
+
+# Add failure details to telemetry
+add_failure_detail() {
+    local detail="$1"
+
+    if [ "$TELEMETRY_ENABLED" != "true" ]; then
+        return 0
+    fi
+
+    # Add detail to failure_details array using jq if available
+    if command -v jq >/dev/null 2>&1 && [ -f "$TELEMETRY_DATA_FILE" ]; then
+        local current_details=$(jq -r '.build_metrics.failure_details // []' "$TELEMETRY_DATA_FILE")
+        local updated_details=$(echo "$current_details" | jq ". + [\"$detail\"]")
+        update_telemetry_field "build_metrics.failure_details" "$updated_details"
+    fi
+}
+
 # Get telemetry summary for build summary integration
 get_telemetry_summary() {
     if [ "$TELEMETRY_ENABLED" != "true" ] || [ ! -f "$TELEMETRY_DATA_FILE" ]; then
@@ -464,6 +564,12 @@ get_telemetry_summary() {
             network_downloaded_bytes: .network_metrics.bytes_downloaded,
             network_uploaded_bytes: .network_metrics.bytes_uploaded,
             failure_category: .build_metrics.failure_category,
+            failure_stage: .build_metrics.failure_stage,
+            failure_reason: .build_metrics.failure_reason,
+            failure_details: .build_metrics.failure_details,
+            failure_code: .build_metrics.failure_code,
+            docker_info: .build_metrics.docker_info,
+            system_resources: .build_metrics.system_resources,
             performance_regressions: .performance_metrics.regressions_detected
         }' "$TELEMETRY_DATA_FILE"
     else
@@ -479,3 +585,7 @@ export -f record_build_failure
 export -f finalize_telemetry
 export -f get_telemetry_summary
 export -f save_as_baseline
+export -f add_failure_detail
+export -f collect_docker_info
+export -f collect_system_resources
+export -f update_final_system_resources
