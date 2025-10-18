@@ -18,6 +18,8 @@ The action automatically generates a `build-summary.json` file containing compre
 *   `parallel_builds`: A boolean value indicating whether parallel builds were enabled.
 *   `max_parallel`: The maximum number of parallel builds.
 *   `packages`: A list of the packages that were built, with their names and sizes.
+*   `lintian`: A list of the Lintian results for each package.
+*   `telemetry`: Enhanced build metrics including memory usage, network statistics, and performance data.
 
 **Example output:**
 ```json
@@ -40,19 +42,30 @@ The action automatically generates a `build-summary.json` file containing compre
   "packages": [
     {"name": "uv_0.9.3-1+bookworm_amd64.deb", "size": 12845632},
     {"name": "uv_0.9.3-1+bookworm_arm64.deb", "size": 11932456}
-  ]
+  ],
+  "telemetry": {
+    "build_duration_seconds": 420,
+    "peak_memory_mb": 2048,
+    "network_downloaded_bytes": 52428800,
+    "network_uploaded_bytes": 1048576,
+    "failure_category": "",
+    "performance_regressions": []
+  }
 }
 ```
 
 **New fields:**
 - `total_size_bytes`: Total size of all packages in bytes
 - `total_size_human`: Human-readable total size (e.g., "315 MB")
+- `telemetry`: Enhanced build metrics section with telemetry data
 
 **Use cases:**
 - **Automated artifact upload** - Parse package list for upload to apt repositories
 - **Release notes generation** - Extract version and package details
 - **Build monitoring** - Track build duration and success rates
+- **Performance analysis** - Monitor memory usage and build performance over time
 - **CI/CD integration** - Use in GitHub Actions workflows for downstream jobs
+- **Regression detection** - Identify performance degradations using telemetry data
 
 **Example GitHub Actions integration:**
 ```yaml
@@ -67,5 +80,7 @@ The action automatically generates a `build-summary.json` file containing compre
   run: |
     PACKAGE_COUNT=$(jq '.total_packages' build-summary.json)
     BUILD_TIME=$(jq '.build_duration_seconds' build-summary.json)
+    PEAK_MEMORY=$(jq -r '.telemetry.peak_memory_mb // "N/A"' build-summary.json)
     echo "Built $PACKAGE_COUNT packages in $BUILD_TIME seconds"
+    echo "Peak memory usage: ${PEAK_MEMORY}MB"
 ```

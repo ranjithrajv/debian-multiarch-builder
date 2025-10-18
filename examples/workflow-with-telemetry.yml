@@ -1,0 +1,184 @@
+name: Build Package with Enhanced Telemetry
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: The version of the software to build
+        type: string
+        required: true
+      build_version:
+        description: The build version
+        type: string
+        required: true
+      architecture:
+        description: Architecture to build (amd64, arm64, armel, armhf, ppc64el, s390x, riscv64, or 'all' for all architectures)
+        type: choice
+        default: 'all'
+        options:
+          - 'all'
+          - 'amd64'
+          - 'arm64'
+          - 'armel'
+          - 'armhf'
+          - 'ppc64el'
+          - 's390x'
+          - 'riscv64'
+      save_baseline:
+        description: Save build as performance baseline
+        type: boolean
+        default: false
+      enable_telemetry:
+        description: Enable enhanced telemetry
+        type: boolean
+        default: true
+      lintian_check:
+        description: Enable lintian validation
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build with Telemetry
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build packages with enhanced telemetry
+        uses: ranjithrajv/debian-multiarch-builder@v1
+        with:
+          config-file: 'multiarch-config.yaml'
+          version: ${{ inputs.version }}
+          build-version: ${{ inputs.build_version }}
+          architecture: ${{ inputs.architecture }}
+          telemetry-enabled: ${{ inputs.enable_telemetry }}
+          save-baseline: ${{ inputs.save_baseline }}
+          lintian-check: ${{ inputs.lintian_check }}
+
+      - name: Upload telemetry data
+        if: ${{ inputs.enable_telemetry }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: telemetry-data-${{ inputs.version }}
+          path: .telemetry/
+          retention-days: 30
+
+      - name: Upload build summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-summary-${{ inputs.version }}
+          path: 'build-summary.json'
+
+      - name: Analyze telemetry data
+        if: ${{ inputs.enable_telemetry }}
+        run: |
+          echo "📊 Build Telemetry Analysis"
+          echo "=========================="
+
+          # Extract key metrics
+          BUILD_TIME=$(jq -r '.telemetry.build_duration_seconds // "N/A"' build-summary.json)
+          PEAK_MEMORY=$(jq -r '.telemetry.peak_memory_mb // "N/A"' build-summary.json)
+          NETWORK_DOWN=$(jq -r '.telemetry.network_downloaded_bytes // 0' build-summary.json)
+          NETWORK_UP=$(jq -r '.telemetry.network_uploaded_bytes // 0' build-summary.json)
+
+          echo "⏱️  Build Duration: ${BUILD_TIME}s"
+          echo "💾 Peak Memory: ${PEAK_MEMORY}MB"
+          echo "⬇️  Downloaded: $(echo $NETWORK_DOWN | numfmt --to=iec)"
+          echo "⬆️  Uploaded: $(echo $NETWORK_UP | numfmt --to=iec)"
+
+          # Check for performance regressions
+          REGRESSIONS=$(jq -r '.telemetry.performance_regressions[] // empty' build-summary.json)
+          if [ -n "$REGRESSIONS" ]; then
+            echo ""
+            echo "⚠️  Performance Regressions Detected:"
+            echo "$REGRESSIONS"
+          fi
+
+          # Check for high memory usage
+          if [ "$PEAK_MEMORY" != "N/A" ] && [ "$PEAK_MEMORY" -gt 4096 ]; then
+            echo ""
+            echo "🚨 High memory usage detected: ${PEAK_MEMORY}MB"
+            echo "   Consider reducing max-parallel or using larger runners"
+          fi
+
+          # Check for build failures
+          FAILURE_CATEGORY=$(jq -r '.telemetry.failure_category // ""' build-summary.json)
+          if [ -n "$FAILURE_CATEGORY" ] && [ "$FAILURE_CATEGORY" != "" ]; then
+            echo ""
+            echo "❌ Build Failure Category: $FAILURE_CATEGORY"
+          fi
+
+      - name: Performance regression check
+        if: ${{ inputs.enable_telemetry }}
+        run: |
+          # Fail the job if performance regressions are detected
+          REGRESSION_COUNT=$(jq -r '.telemetry.performance_regressions | length // 0' build-summary.json)
+          if [ "$REGRESSION_COUNT" -gt 0 ]; then
+            echo "::error::Performance regressions detected ($REGRESSION_COUNT)"
+            jq -r '.telemetry.performance_regressions[]' build-summary.json | sed 's/^/  - /'
+            exit 1
+          fi
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian-packages-${{ inputs.version }}
+          path: '*.deb'
+
+  release:
+    name: Create Draft Release
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: debian-packages-*
+          merge-multiple: true
+
+      - name: Generate Release Notes with Telemetry
+        if: ${{ inputs.enable_telemetry }}
+        run: |
+          # Download build summary
+          gh run download ${{ github.run_id }} --name build-summary-${{ inputs.version }} --dir ./
+
+          # Extract telemetry data for release notes
+          BUILD_TIME=$(jq -r '.telemetry.build_duration_seconds // "N/A"' build-summary.json)
+          PEAK_MEMORY=$(jq -r '.telemetry.peak_memory_mb // "N/A"' build-summary.json)
+          PACKAGE_COUNT=$(jq -r '.total_packages' build-summary.json)
+
+          cat > release-notes.md << EOF
+          # Release ${{ inputs.version }}+${{ inputs.build_version }}
+
+          ## Package Information
+          - **Version**: ${{ inputs.version }}+${{ inputs.build_version }}
+          - **Packages Built**: $PACKAGE_COUNT
+          - **Build Duration**: ${BUILD_TIME}s
+          - **Peak Memory Usage**: ${PEAK_MEMORY}MB
+
+          ## Performance Metrics
+          This release was built with enhanced telemetry monitoring.
+
+          EOF
+
+          echo "Release notes generated:"
+          cat release-notes.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish Release Draft
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: '*.deb'
+          name: ${{ inputs.version }}+${{ inputs.build_version }}
+          tag_name: ${{ inputs.version }}
+          body_path: release-notes.md
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

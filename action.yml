@@ -25,10 +25,18 @@ inputs:
     required: false
     default: '2'
   lintian-check:
-    description: 'Enable lintian validation of built packages (true/false)'
+    description: 'Enable Lintian check for Debian packages'
     required: false
     default: 'false'
-
+  telemetry-enabled:
+    description: 'Enable enhanced build telemetry and metrics collection'
+    required: false
+    default: 'true'
+  save-baseline:
+    description: 'Save current build metrics as performance baseline for regression detection'
+    required: false
+    default: 'false'
+  
 outputs:
   packages:
     description: 'List of generated .deb package files'
@@ -67,6 +75,8 @@ runs:
         ARCHITECTURE: ${{ inputs.architecture }}
         MAX_PARALLEL: ${{ inputs.max-parallel }}
         LINTIAN_CHECK: ${{ inputs.lintian-check }}
+        TELEMETRY_ENABLED: ${{ inputs.telemetry-enabled }}
+        SAVE_BASELINE: ${{ inputs.save-baseline }}
         ACTION_PATH: ${{ github.action_path }}
       run: |
         echo "Starting multi-architecture build..."
