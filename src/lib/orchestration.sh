@@ -77,29 +77,46 @@ build_all_architectures_parallel() {
     echo "⚡ Parallel builds enabled (max: $MAX_PARALLEL concurrent)"
     echo ""
 
+    echo "DEBUG: [main] Starting parallel orchestration for ${total_archs} architectures" >&2
+
     declare -a pids=()
     declare -a active_archs=()
     local arch_index=0
 
     # Start initial batch of builds
+    echo "DEBUG: [main] Starting initial batch (max: $MAX_PARALLEL)" >&2
     for build_arch in "${arch_array[@]}"; do
         if [ ${#pids[@]} -lt $MAX_PARALLEL ]; then
             echo "🔨 Starting build for $build_arch (${arch_index}/$total_archs)..."
+            echo "DEBUG: [main] About to background build for $build_arch" >&2
             build_architecture_parallel "$build_arch" &
-            pids+=($!)
+            local last_pid=$!
+            echo "DEBUG: [main] Backgrounded PID: $last_pid" >&2
+            pids+=($last_pid)
             active_archs+=("$build_arch")
             ((arch_index++))
+            echo "DEBUG: [main] Current PIDs array size: ${#pids[@]}" >&2
         else
+            echo "DEBUG: [main] Reached MAX_PARALLEL limit, breaking" >&2
             break
         fi
     done
 
+    echo "DEBUG: [main] Initial batch started: ${#pids[@]} jobs" >&2
+
     # As builds complete, start new ones
+    echo "DEBUG: [main] Entering main monitoring loop" >&2
+    local loop_count=0
     while [ $arch_index -lt $total_archs ] || [ ${#pids[@]} -gt 0 ]; do
+        ((loop_count++))
+        echo "DEBUG: [main] Loop iteration $loop_count: arch_index=$arch_index, total=$total_archs, active_pids=${#pids[@]}" >&2
+
         # Check for completed builds
         for i in "${!pids[@]}"; do
             pid=${pids[$i]}
+            echo "DEBUG: [main] Checking PID $pid (index $i)" >&2
             if ! kill -0 $pid 2>/dev/null; then
+                echo "DEBUG: [main] PID $pid has completed" >&2
                 # Build completed - capture exit code before it's lost
                 set +e  # Temporarily disable exit-on-error
                 wait $pid
