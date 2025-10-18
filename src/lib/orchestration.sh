@@ -124,6 +124,7 @@ build_all_architectures_parallel() {
     if [ "$failed" = "true" ]; then
         echo ""
         echo "❌ Some builds failed"
+        cleanup_api_cache
         exit 1
     fi
 }

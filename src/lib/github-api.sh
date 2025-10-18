@@ -2,14 +2,15 @@
 
 # GitHub API interaction functions
 
-# Cache for GitHub API release assets
-RELEASE_ASSETS_CACHE=""
-
 # Function to fetch release assets from GitHub API
+# Uses file-based cache to share data across parallel builds
 fetch_release_assets() {
-    # Return cached result if available
-    if [ -n "$RELEASE_ASSETS_CACHE" ]; then
-        echo "$RELEASE_ASSETS_CACHE"
+    # Generate cache file path (replace / with _ in repo name)
+    local cache_file="/tmp/release_assets_${GITHUB_REPO//\//_}_${VERSION}.cache"
+
+    # Check if cached file exists and return its contents
+    if [ -f "$cache_file" ]; then
+        cat "$cache_file"
         return 0
     fi
 
@@ -29,7 +30,15 @@ Possible reasons:
 Please check: https://github.com/${GITHUB_REPO}/releases/tag/${VERSION}"
     fi
 
-    # Cache the result
-    RELEASE_ASSETS_CACHE="$assets"
+    # Write to cache file atomically (tmp file + move)
+    echo "$assets" > "${cache_file}.tmp" && mv "${cache_file}.tmp" "$cache_file"
     echo "$assets"
+}
+
+# Function to cleanup API cache files
+cleanup_api_cache() {
+    local cache_file="/tmp/release_assets_${GITHUB_REPO//\//_}_${VERSION}.cache"
+    if [ -f "$cache_file" ]; then
+        rm -f "$cache_file" 2>/dev/null || true
+    fi
 }

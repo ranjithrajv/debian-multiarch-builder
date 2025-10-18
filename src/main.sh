@@ -89,6 +89,7 @@ else
     echo ""
 
     if ! build_architecture "$ARCH"; then
+        cleanup_api_cache
         exit 1
     fi
 
@@ -103,3 +104,6 @@ else
     ARCHITECTURES=$ARCH
     generate_build_summary
 fi
+
+# Cleanup API cache files
+cleanup_api_cache
