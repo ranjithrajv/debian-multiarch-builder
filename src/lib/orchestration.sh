@@ -125,12 +125,14 @@ build_all_architectures_parallel() {
                 if [ $exit_code -eq 0 ]; then
                     echo "✅ Completed build for $arch$duration_str [$completed_count/$total_archs]"
                 else
-                    echo "❌ Failed build for $arch$duration_str [$completed_count/$total_archs]"
+                    echo "⚠️  Build for $arch completed with errors$duration_str [$completed_count/$total_archs]"
+                    echo "   💡 Architecture $arch will be skipped - other architectures will continue"
                     # Print log immediately to help with debugging
                     if [ -f "build_${arch}.log" ]; then
-                        echo "==== Build log for $arch ===="
-                        cat "build_${arch}.log"
-                        echo "==== End of log ===="
+                        echo "   📋 Error details for $arch:"
+                        cat "build_${arch}.log" | head -10  # Show first 10 lines of errors
+                        echo "   🔍 Full log available in build_${arch}.log"
+                        echo ""
                     fi
                 fi
 

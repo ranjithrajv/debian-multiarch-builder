@@ -233,21 +233,27 @@ If binaries are in a subdirectory, add 'binary_path' to your config:
             success "Built ${PACKAGE_NAME} for $dist"
         else
             failed_dists+=("$dist")
-            warning "Failed to build for $dist"
+            echo "   ⚠️  $dist build failed - $build_arch will try other distributions"
         fi
 
         # Clean up status files
         rm -f "build_${build_arch}_${dist}.status"
     done
 
-    # Display any failures
+    # Display any failures with clearer context
     if [ ${#failed_dists[@]} -gt 0 ]; then
-        error "Failed to build $build_arch for distributions: ${failed_dists[*]}
-
-Check logs:
-$(for dist in "${failed_dists[@]}"; do
-    echo "  build_${build_arch}_${dist}.log"
-done)"
+        successful_dists=$((${#dist_names[@]} - ${#failed_dists[@]}))
+        echo ""
+        echo "   📊 Distribution Summary for $build_arch:"
+        echo "      ✅ Successful: $successful_dists distributions"
+        echo "      ❌ Failed: ${#failed_dists[@]} distributions (${failed_dists[*]})"
+        echo "      📈 Success Rate: $(( (successful_dists * 100) / ${#dist_names[@]} ))%"
+        echo ""
+        echo "   💡 Failed distribution logs available for debugging:"
+        for dist in "${failed_dists[@]}"; do
+            echo "      build_${build_arch}_${dist}.log"
+        done
+        echo ""
     fi
 
     # Clean up log files

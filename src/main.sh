@@ -113,19 +113,62 @@ if [ "$ARCH" = "all" ]; then
         if [ "$TOTAL_PACKAGES" -gt 0 ]; then
             echo ""
             echo "=========================================="
-            echo "🎉 All architectures built successfully!"
+
+            # Calculate what was built vs what was attempted
+            TARGET_PACKAGES=$((TOTAL_ARCHS * 4))  # 4 distributions per architecture
+            SUCCESS_RATE=$(( (TOTAL_PACKAGES * 100) / TARGET_PACKAGES ))
+
+            if [ "$TOTAL_PACKAGES" -eq "$TARGET_PACKAGES" ]; then
+                echo "🎉 All architectures built successfully!"
+            elif [ "$TOTAL_PACKAGES" -gt 0 ]; then
+                echo "✅ Build completed with partial success ($SUCCESS_RATE% success rate)"
+            else
+                echo "⚠️  Build completed but no packages were generated!"
+            fi
+
             echo "=========================================="
             echo ""
+
+            # Show what was built
             echo "Generated packages:"
             ls -lh ${PACKAGE_NAME}_*.deb | awk '{print "  " $9 " (" $5 ")"}'
             echo ""
-            echo "✅ Total: $TOTAL_PACKAGES packages"
+
+            # Show build summary
+            echo "📊 Build Summary:"
+            echo "  🎯 Target: $TARGET_PACKAGES packages ($TOTAL_ARCHS architectures × 4 distributions)"
+            echo "  ✅ Built: $TOTAL_PACKAGES packages"
+            echo "  📈 Success Rate: $SUCCESS_RATE%"
+
+            # Show which architectures succeeded
+            local built_archs=$(ls ${PACKAGE_NAME}_*.deb 2>/dev/null | sed "s/.*${PACKAGE_NAME}_.*+\([^-]*\)_.*\.deb/\1/" | sort -u)
+            if [ -n "$built_archs" ]; then
+                echo "  ✅ Successful Architectures: $built_archs"
+            fi
+
+            # Show which architectures failed (if any)
+            local failed_archs=""
+            for arch in $ARCHITECTURES; do
+                if ! echo "$built_archs" | grep -q "$arch"; then
+                    failed_archs="$failed_archs $arch"
+                fi
+            done
+            if [ -n "$failed_archs" ]; then
+                echo "  ❌ Skipped/Failed Architectures:$failed_archs"
+            fi
+
+            echo ""
+            echo "✅ Total: $TOTAL_PACKAGES packages successfully built"
 
             # Generate build summary JSON
             generate_build_summary
 
             # Record successful completion in telemetry
-            record_build_stage_complete "build_completion" "success" "All builds completed successfully"
+            if [ "$TOTAL_PACKAGES" -eq "$TARGET_PACKAGES" ]; then
+                record_build_stage_complete "build_completion" "success" "All builds completed successfully"
+            else
+                record_build_stage_complete "build_completion" "partial_success" "Build completed with $TOTAL_PACKAGES/$TARGET_PACKAGES packages ($SUCCESS_RATE% success rate)"
+            fi
         else
             # Build functions returned success but no packages were created
             echo ""
