@@ -45,6 +45,64 @@ outputs:
 runs:
   using: 'composite'
   steps:
+    - name: Install minimal dependencies for validation
+      shell: bash
+      run: |
+        # Install only what's needed for version validation
+        sudo apt-get update
+        sudo apt-get install -y curl
+
+    - name: Validate version availability
+      shell: bash
+      run: |
+        echo "🔍 Checking if version ${{ inputs.version }} exists..."
+
+        # Basic validation without yq (since it's not installed yet)
+        if [ ! -f "${{ inputs.config-file }}" ]; then
+          echo "❌ Configuration file not found: ${{ inputs.config-file }}"
+          exit 1
+        fi
+
+        # Extract GitHub repo from config file using basic grep/sed
+        GITHUB_REPO=$(grep "github_repo:" "${{ inputs.config-file }}" | sed 's/.*github_repo: *["'\'']\? *//;s/["'\''] *$//' 2>/dev/null || echo "")
+
+        if [ -z "$GITHUB_REPO" ]; then
+          echo "⚠️  Warning: Could not determine GitHub repo from config, skipping version validation"
+          echo "    Expected format in config: github_repo: \"owner/repo\""
+        else
+          echo "📋 Validating version ${{ inputs.version }} for $GITHUB_REPO..."
+
+          # Check if version exists using GitHub API
+          RELEASE_URL="https://api.github.com/repos/${GITHUB_REPO}/releases/tags/${{ inputs.version }}"
+
+          echo "🌐 Checking release: $RELEASE_URL"
+
+          if curl -s -f -o /dev/null -w "%{http_code}" "$RELEASE_URL" | grep -q "^200$"; then
+            echo "✅ Version ${{ inputs.version }} exists and is accessible"
+          else
+            echo "❌ Version ${{ inputs.version }} does not exist or is not accessible!"
+            echo ""
+            echo "📦 Latest available versions for $GITHUB_REPO:"
+
+            # Get latest 3 versions for suggestion
+            LATEST_VERSIONS=$(curl -s "https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=3" | grep -o '"tag_name": *"[^"]*"' | sed 's/"tag_name": *"\([^"]*\)"/\1/' 2>/dev/null || echo "Could not fetch versions")
+
+            if [ -n "$LATEST_VERSIONS" ] && [ "$LATEST_VERSIONS" != "Could not fetch versions" ]; then
+              echo "$LATEST_VERSIONS" | while read -r version; do
+                echo "  - $version"
+              done
+            else
+              echo "  Check https://github.com/${GITHUB_REPO}/releases for available versions"
+            fi
+
+            echo ""
+            echo "💡 Please use a valid version and retry the build."
+            echo "   Current requested: ${{ inputs.version }}"
+            echo ""
+            exit 1
+          fi
+        fi
+
     - name: Install dependencies
       shell: bash
       run: |
@@ -64,46 +122,6 @@ runs:
           exit 1
         fi
         echo "Configuration file found: ${{ inputs.config-file }}"
-
-    - name: Validate version availability
-      shell: bash
-      run: |
-        echo "Checking if version ${{ inputs.version }} exists..."
-
-        # Extract GitHub repo from config file
-        GITHUB_REPO=$(yq eval '.github_repo' "${{ inputs.config-file }}" 2>/dev/null || echo "")
-
-        if [ -z "$GITHUB_REPO" ]; then
-          echo "⚠️  Warning: Could not determine GitHub repo from config, skipping version validation"
-        else
-          echo "Validating version ${{ inputs.version }} for $GITHUB_REPO..."
-
-          # Check if version exists using GitHub API
-          RELEASE_URL="https://api.github.com/repos/${GITHUB_REPO}/releases/tags/${{ inputs.version }}"
-
-          if curl -s -f -o /dev/null -w "%{http_code}" "$RELEASE_URL" | grep -q "^200$"; then
-            echo "✅ Version ${{ inputs.version }} exists and is accessible"
-          else
-            echo "❌ Version ${{ inputs.version }} does not exist or is not accessible!"
-            echo ""
-            echo "Latest available versions for $GITHUB_REPO:"
-
-            # Get latest 3 versions for suggestion
-            LATEST_VERSIONS=$(curl -s "https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=3" | jq -r '.[].tag_name' 2>/dev/null || echo "Could not fetch versions")
-
-            if [ -n "$LATEST_VERSIONS" ] && [ "$LATEST_VERSIONS" != "Could not fetch versions" ]; then
-              echo "$LATEST_VERSIONS" | while read -r version; do
-                echo "  - $version"
-              done
-            else
-              echo "  Check https://github.com/${GITHUB_REPO}/releases for available versions"
-            fi
-
-            echo ""
-            echo "💡 Please use a valid version and retry the build."
-            exit 1
-          fi
-        fi
 
     - name: Build packages
       id: build
