@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Enhanced build observability** - Real-time visibility into build progress and metrics
+  - Per-architecture build timing displays duration for each build (e.g., "1m36s", "57s")
+  - Progress indicators show completion ratio ([3/8]) and currently running builds
+  - Enhanced error summaries with clean failure counts and architecture lists
+  - Total artifact size tracking in both bytes and human-readable format (e.g., "315 MB")
+- **max-parallel action input** - Control concurrent builds directly from workflow
+  - New optional input parameter for GitHub Actions workflows
+  - Priority: action input > environment variable > YAML config > default (2)
+  - Allows per-run tuning without modifying config files
+  - Recommended: 2 for GitHub runners, 4+ for self-hosted runners
 - **Smart defaults from system.yaml** - Distributions and architectures are now optional
   - If not specified in package.yaml, automatically uses all valid Debian distributions and architectures
   - Minimal config: just package_name, github_repo, and artifact_format required

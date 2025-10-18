@@ -87,6 +87,7 @@ Edit `.github/workflows/release.yml`:
     version: ${{ inputs.version }}
     build-version: ${{ inputs.build_version }}
     architecture: ${{ inputs.architecture }}
+    max-parallel: '2'  # Optional: control concurrent builds (default: 2)
 ```
 
 Also add the architecture input to your workflow:
