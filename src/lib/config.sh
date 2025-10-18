@@ -56,11 +56,20 @@ parse_config() {
     # Parse parallel builds settings from overrides or package file
     if [ -f "$overrides_file" ]; then
         PARALLEL_BUILDS=$(yq eval '.parallel_builds // true' "$overrides_file")
-        MAX_PARALLEL=$(yq eval '.max_parallel // 2' "$overrides_file")
+        # MAX_PARALLEL priority: env var > overrides file > package file > default
+        if [ -z "$MAX_PARALLEL" ]; then
+            MAX_PARALLEL=$(yq eval '.max_parallel // 2' "$overrides_file")
+        fi
     else
         PARALLEL_BUILDS=$(yq eval '.parallel_builds // true' "$package_file")
-        MAX_PARALLEL=$(yq eval '.max_parallel // 2' "$package_file")
+        # MAX_PARALLEL priority: env var > package file > default
+        if [ -z "$MAX_PARALLEL" ]; then
+            MAX_PARALLEL=$(yq eval '.max_parallel // 2' "$package_file")
+        fi
     fi
+
+    # Ensure MAX_PARALLEL has a default value
+    MAX_PARALLEL=${MAX_PARALLEL:-2}
 
     # Validate required fields
     if [ "$PACKAGE_NAME" = "null" ] || [ -z "$PACKAGE_NAME" ]; then

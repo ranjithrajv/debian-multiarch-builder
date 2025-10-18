@@ -2,6 +2,19 @@
 
 # Build orchestration functions (parallel and sequential)
 
+# Helper function to format duration in human-readable format
+format_duration() {
+    local seconds=$1
+    local minutes=$((seconds / 60))
+    local remaining_seconds=$((seconds % 60))
+
+    if [ $minutes -gt 0 ]; then
+        echo "${minutes}m${remaining_seconds}s"
+    else
+        echo "${seconds}s"
+    fi
+}
+
 # Function to build architecture with logging to file (for parallel builds)
 build_architecture_parallel() {
     # Disable exit-on-error for backgrounded function
@@ -9,6 +22,7 @@ build_architecture_parallel() {
 
     local build_arch=$1
     local log_file="build_${build_arch}.log"
+    local start_time=$(date +%s)
 
     # Redirect all output to log file
     {
@@ -20,7 +34,14 @@ build_architecture_parallel() {
         fi
     } > "$log_file" 2>&1
 
-    return $?
+    local exit_code=$?
+    local end_time=$(date +%s)
+    local duration=$((end_time - start_time))
+
+    # Save duration for reporting
+    echo "$duration" > "build_${build_arch}.time"
+
+    return $exit_code
 }
 
 # Function to build all architectures sequentially
@@ -57,6 +78,7 @@ build_all_architectures_parallel() {
     declare -a pids=()
     declare -a active_archs=()
     local arch_index=0
+    local completed_count=0
 
     # Start initial batch of builds
     for build_arch in "${arch_array[@]}"; do
@@ -84,10 +106,20 @@ build_all_architectures_parallel() {
                 set -e  # Re-enable exit-on-error
 
                 arch=${active_archs[$i]}
+
+                # Read duration if available
+                local duration_str=""
+                if [ -f "build_${arch}.time" ]; then
+                    local duration=$(cat "build_${arch}.time")
+                    duration_str=" ($(format_duration $duration))"
+                fi
+
+                completed_count=$((completed_count + 1))
+
                 if [ $exit_code -eq 0 ]; then
-                    echo "✅ Completed build for $arch"
+                    echo "✅ Completed build for $arch$duration_str [$completed_count/$total_archs]"
                 else
-                    echo "❌ Failed build for $arch"
+                    echo "❌ Failed build for $arch$duration_str [$completed_count/$total_archs]"
                     # Print log immediately to help with debugging
                     if [ -f "build_${arch}.log" ]; then
                         echo "==== Build log for $arch ===="
@@ -110,6 +142,11 @@ build_all_architectures_parallel() {
                     pids+=($!)
                     active_archs+=("$next_arch")
                     arch_index=$((arch_index + 1))
+
+                    # Show currently running builds
+                    if [ ${#active_archs[@]} -gt 0 ]; then
+                        echo "   ⚡ Running: ${active_archs[*]}"
+                    fi
                 fi
 
                 break
@@ -119,24 +156,32 @@ build_all_architectures_parallel() {
         sleep 1
     done
 
-    # Check for any failures
+    # Check for any failures and provide detailed summary
     local failed=false
+    local failed_archs=()
+
     for arch in "${arch_array[@]}"; do
         if [ -f "build_${arch}.status" ]; then
             status=$(cat "build_${arch}.status")
             if [ "$status" = "FAILED" ]; then
                 failed=true
-                echo ""
-                echo "❌ Build failed for $arch. Log:"
-                cat "build_${arch}.log"
+                failed_archs+=("$arch")
             fi
-            rm -f "build_${arch}.status" "build_${arch}.log"
+            rm -f "build_${arch}.status" "build_${arch}.log" "build_${arch}.time"
         fi
     done
 
     if [ "$failed" = "true" ]; then
         echo ""
-        echo "❌ Some builds failed"
+        echo "=========================================="
+        echo "❌ Build Summary: ${#failed_archs[@]} failed, $((total_archs - ${#failed_archs[@]})) succeeded"
+        echo "=========================================="
+        echo ""
+        echo "Failed architectures:"
+        for arch in "${failed_archs[@]}"; do
+            echo "  • $arch"
+        done
+        echo ""
         cleanup_api_cache
         exit 1
     fi

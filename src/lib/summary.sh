@@ -10,9 +10,11 @@ generate_build_summary() {
     # Get list of built packages with their sizes
     local packages_json="["
     local first=true
+    local total_size=0
     for pkg in ${PACKAGE_NAME}_*.deb; do
         if [ -f "$pkg" ]; then
             local size=$(stat -f%z "$pkg" 2>/dev/null || stat -c%s "$pkg" 2>/dev/null || echo "0")
+            total_size=$((total_size + size))
             if [ "$first" = true ]; then
                 first=false
             else
@@ -27,6 +29,16 @@ generate_build_summary() {
     local archs_json=$(echo "$ARCHITECTURES" | tr ' ' '\n' | jq -R -s 'split("\n") | map(select(length > 0))')
     local dists_json=$(echo "$DISTRIBUTIONS" | tr ' ' '\n' | jq -R -s 'split("\n") | map(select(length > 0))')
 
+    # Convert total size to human-readable format
+    local size_mb=$((total_size / 1024 / 1024))
+    local size_kb=$((total_size / 1024))
+    local size_human
+    if [ $size_mb -gt 0 ]; then
+        size_human="${size_mb} MB"
+    else
+        size_human="${size_kb} KB"
+    fi
+
     # Generate build summary JSON
     cat > build-summary.json <<EOF
 {
@@ -38,6 +50,8 @@ generate_build_summary() {
   "architectures": $archs_json,
   "distributions": $dists_json,
   "total_packages": $TOTAL_PACKAGES,
+  "total_size_bytes": $total_size,
+  "total_size_human": "$size_human",
   "build_duration_seconds": $build_duration,
   "build_start": "$(date -d @$BUILD_START_TIME '+%Y-%m-%dT%H:%M:%S%z' 2>/dev/null || date -r $BUILD_START_TIME '+%Y-%m-%dT%H:%M:%S%z')",
   "build_end": "$(date '+%Y-%m-%dT%H:%M:%S%z')",
@@ -48,4 +62,5 @@ generate_build_summary() {
 EOF
 
     success "Build summary saved to build-summary.json"
+    echo "   📦 Total artifact size: $size_human ($TOTAL_PACKAGES packages)"
 }
