@@ -20,6 +20,10 @@ inputs:
     description: 'Architecture to build (amd64, arm64, armel, armhf, ppc64el, s390x, riscv64, or "all")'
     required: false
     default: 'all'
+  max-parallel:
+    description: 'Maximum number of parallel builds (default: 2, recommended: 2-4 for GitHub runners)'
+    required: false
+    default: '2'
 
 outputs:
   packages:
@@ -57,6 +61,7 @@ runs:
         VERSION: ${{ inputs.version }}
         BUILD_VERSION: ${{ inputs.build-version }}
         ARCHITECTURE: ${{ inputs.architecture }}
+        MAX_PARALLEL: ${{ inputs.max-parallel }}
         ACTION_PATH: ${{ github.action_path }}
       run: |
         echo "Starting multi-architecture build..."
