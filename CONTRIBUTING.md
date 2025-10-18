@@ -44,26 +44,40 @@ Thank you for considering contributing to this project! We welcome contributions
    - Link related issues
    - Ensure CI checks pass
 
-## Development Guidelines
+## Development Workflow
 
-### Code Style
+### Local Development Environment
 
-- Use consistent indentation (2 spaces for YAML, appropriate for shell scripts)
-- Add comments for complex logic
-- Follow existing naming conventions
+To set up a local development environment, you will need to have the following tools installed:
 
-### Testing
+*   [Docker](https://www.docker.com/)
+*   [ShellCheck](https://www.shellcheck.net/)
+*   [yq](https://github.com/mikefarah/yq)
 
-- Test changes with at least one example configuration
-- Verify builds complete successfully
-- Check error handling works as expected
+### Running Tests
 
-### Documentation
+The action does not have a formal test suite. However, you can test your changes by using the example configurations in the `examples/` directory. To do this, you will need to have a local copy of the action. You can then run the action locally using the following command:
 
-- Update README.md for user-facing changes
-- Update relevant docs in `docs/` directory
-- Add examples for new features
-- Update CHANGELOG.md following [Keep a Changelog](https://keepachangelog.com/) format
+```bash
+./build.sh examples/lazygit-config.yaml 0.38.2 1 all
+```
+
+This will build the `lazygit` package for all supported architectures.
+
+### Building the Action
+
+The action is a composite action, so there is no need to build it. You can simply use the action directly from the repository.
+
+### Submitting Changes
+
+When you are ready to submit your changes, please follow these steps:
+
+1.  **Fork the repository**
+2.  **Create a feature branch**
+3.  **Make your changes**
+4.  **Test your changes**
+5.  **Commit your changes**
+6.  **Submit a pull request**
 
 ## Adding New Features
 
@@ -94,20 +108,20 @@ When adding new configuration options:
 ## Project Structure
 
 ```
-debian-multiarch-builder/
-├── .github/
-│   └── workflows/        # GitHub Actions workflows
-├── docs/                 # Detailed documentation
-│   ├── MIGRATION.md
-│   ├── USAGE.md
-│   └── TROUBLESHOOTING.md
-├── examples/             # Configuration examples
-├── build.sh              # Main build script
-├── Dockerfile            # Package build template
-├── action.yml            # GitHub Action definition
-├── README.md             # Main documentation
-├── CHANGELOG.md          # Version history
-└── CONTRIBUTING.md       # This file
+src/
+├── lib/
+│   ├── utils.sh          # Logging and output formatting
+│   ├── config.sh         # Configuration parsing and validation
+│   ├── github-api.sh     # GitHub API interactions
+│   ├── discovery.sh      # Architecture pattern discovery
+│   ├── validation.sh     # Release and checksum validation
+│   ├── build.sh          # Core build functions
+│   ├── orchestration.sh  # Build orchestration (parallel and sequential)
+│   └── summary.sh        # Build summary generation
+├── system.yaml           # System constants and Debian official policies
+├── defaults.yaml         # User-configurable default settings
+├── main.sh               # Main entry point
+build.sh                  # Wrapper for backward compatibility
 ```
 
 ## Release Process
