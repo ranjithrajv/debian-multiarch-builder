@@ -56,7 +56,7 @@ build_architecture_sequential() {
     echo ""
 
     for build_arch in "${arch_array[@]}"; do
-        ((current++))
+        current=$((current + 1))
         echo "=========================================="
         echo "Building $current/$total_archs: $build_arch"
         echo "=========================================="
@@ -94,7 +94,7 @@ build_all_architectures_parallel() {
             echo "DEBUG: [main] Backgrounded PID: $last_pid" >&2
             pids+=($last_pid)
             active_archs+=("$build_arch")
-            ((arch_index++))
+            arch_index=$((arch_index + 1))
             echo "DEBUG: [main] Current PIDs array size: ${#pids[@]}" >&2
         else
             echo "DEBUG: [main] Reached MAX_PARALLEL limit, breaking" >&2
@@ -108,7 +108,7 @@ build_all_architectures_parallel() {
     echo "DEBUG: [main] Entering main monitoring loop" >&2
     local loop_count=0
     while [ $arch_index -lt $total_archs ] || [ ${#pids[@]} -gt 0 ]; do
-        ((loop_count++))
+        loop_count=$((loop_count + 1))
         echo "DEBUG: [main] Loop iteration $loop_count: arch_index=$arch_index, total=$total_archs, active_pids=${#pids[@]}" >&2
 
         # Check for completed builds
@@ -149,7 +149,7 @@ build_all_architectures_parallel() {
                     build_architecture_parallel "$next_arch" &
                     pids+=($!)
                     active_archs+=("$next_arch")
-                    ((arch_index++))
+                    arch_index=$((arch_index + 1))
                 fi
 
                 break
