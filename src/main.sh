@@ -102,18 +102,13 @@ if [ "$ARCH" = "all" ]; then
     # Pre-detect available architectures for this version
     info "Detecting available architectures for $PACKAGE_NAME version $VERSION..."
     for arch in "${ARCH_ARRAY[@]}"; do
-        if check_release_exists "$VERSION"; then
-            # Check if this architecture has release assets available
-            local pattern=$(get_release_pattern "$arch" 2>/dev/null)
-            if [ $? -eq 0 ] && [ -n "$pattern" ]; then
-                echo "$arch" >> /tmp/available_architectures.txt
-                info "  ✓ $arch: Available"
-            else
-                info "  ✗ $arch: Not available (no matching release assets)"
-            fi
+        # Check if this architecture has release assets available
+        local pattern=$(get_release_pattern "$arch" 2>/dev/null)
+        if [ $? -eq 0 ] && [ -n "$pattern" ]; then
+            echo "$arch" >> /tmp/available_architectures.txt
+            info "  ✓ $arch: Available"
         else
-            error "Version $VERSION not found in release assets"
-            return 1
+            info "  ✗ $arch: Not available (no matching release assets)"
         fi
     done
 
