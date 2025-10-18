@@ -13,7 +13,7 @@ BASELINE_DATA_FILE="$TELEMETRY_DIR/baseline.json"
 # Telemetry state variables
 BUILD_START_TIME=""
 BUILD_END_TIME=""
-PEAK_MEMORY_USAGE=0
+export PEAK_MEMORY_USAGE=0
 CURRENT_MEMORY_USAGE=0
 NETWORK_BYTES_DOWNLOADED=0
 NETWORK_BYTES_UPLOADED=0
@@ -21,15 +21,18 @@ BUILD_FAILURE_CATEGORY=""
 PERFORMANCE_REGRESSIONS=()
 
 # Network tracking
-NETWORK_INTERFACE=$(ip route get 8.8.8.8 2>/dev/null | awk '{print $5; exit}' || echo "eth0")
+export NETWORK_INTERFACE=$(ip route get 8.8.8.8 2>/dev/null | awk '{print $5; exit}' || echo "eth0")
 
 # Initialize telemetry system
 init_telemetry() {
     if [ "$TELEMETRY_ENABLED" != "true" ]; then
+        echo "Telemetry disabled"
         return 0
     fi
 
     mkdir -p "$TELEMETRY_DIR"
+    echo "Telemetry initialized: TELEMETRY_ENABLED=$TELEMETRY_ENABLED, TELEMETRY_DIR=$TELEMETRY_DIR"
+    echo "Network interface: $NETWORK_INTERFACE"
 
     # Initialize telemetry log
     {
@@ -111,15 +114,19 @@ start_memory_monitoring() {
         return 0
     fi
 
-    # Monitor memory in background
+    echo "Starting memory monitoring..."
+
+    # Monitor memory in background with exported variables
     {
+        echo "Memory monitor started: $$" >> "$TELEMETRY_DIR/memory-monitor.log"
         while [ -f "$TELEMETRY_DIR/monitoring.active" ]; do
             local mem_usage=$(get_current_memory_usage)
             local timestamp=$(date +%s)
 
-            # Update peak memory
-            if [ "$mem_usage" -gt "$PEAK_MEMORY_USAGE" ]; then
-                PEAK_MEMORY_USAGE=$mem_usage
+            # Update peak memory in a file to avoid race conditions
+            current_peak=$(cat "$TELEMETRY_DIR/current-peak-memory.txt" 2>/dev/null || echo "0")
+            if [ "$mem_usage" -gt "$current_peak" ]; then
+                echo "$mem_usage" > "$TELEMETRY_DIR/current-peak-memory.txt"
             fi
 
             # Log memory sample
@@ -127,11 +134,14 @@ start_memory_monitoring() {
 
             sleep 5  # Sample every 5 seconds
         done
+        echo "Memory monitor stopped" >> "$TELEMETRY_DIR/memory-monitor.log"
     } &
 
     # Create monitoring flag
     touch "$TELEMETRY_DIR/monitoring.active"
     echo $! > "$TELEMETRY_DIR/memory-monitor.pid"
+    echo "0" > "$TELEMETRY_DIR/current-peak-memory.txt"
+    echo "Memory monitoring started with PID: $!"
 }
 
 # Get current memory usage in MB
@@ -156,9 +166,12 @@ start_network_monitoring() {
         return 0
     fi
 
+    echo "Starting network monitoring on interface: $NETWORK_INTERFACE"
+
     # Get initial network stats
     local initial_stats=$(get_network_stats)
     echo "$initial_stats" > "$TELEMETRY_DIR/network-initial.log"
+    echo "Initial network stats: $initial_stats" >> "$TELEMETRY_DIR/network-monitor.log"
 
     # Monitor network in background
     {
@@ -187,14 +200,22 @@ start_network_monitoring() {
 # Get network statistics
 get_network_stats() {
     # Try multiple methods to get network stats
+    local stats=""
+
     if command -v ip >/dev/null 2>&1; then
         # Use ip command
-        ip -s link show "$NETWORK_INTERFACE" 2>/dev/null | awk '/RX:/{getline; rx=$2} /TX:/{getline; tx=$2} END{print rx, tx}'
-    elif [ -f "/proc/net/dev" ]; then
-        # Use /proc/net/dev
-        awk -v iface="$NETWORK_INTERFACE" '$1 ~ iface {print $2, $10}' /proc/net/dev
-    else
+        stats=$(ip -s link show "$NETWORK_INTERFACE" 2>/dev/null | awk '/RX:/{getline; rx=$2} /TX:/{getline; tx=$2} END{print rx, tx}')
+    fi
+
+    if [ -z "$stats" ] && [ -f "/proc/net/dev" ]; then
+        # Use /proc/net/dev as fallback
+        stats=$(awk -v iface="$NETWORK_INTERFACE" '$1 ~ iface {print $2, $10}' /proc/net/dev)
+    fi
+
+    if [ -z "$stats" ]; then
         echo "0 0"
+    else
+        echo "$stats"
     fi
 }
 
@@ -310,6 +331,7 @@ finalize_telemetry() {
         return 0
     fi
 
+    echo "Finalizing telemetry collection..."
     BUILD_END_TIME=$(date +%s)
 
     # Stop monitoring
@@ -377,6 +399,11 @@ update_final_telemetry_data() {
 
     if [ "$TELEMETRY_ENABLED" != "true" ]; then
         return 0
+    fi
+
+    # Read peak memory from file to get latest value
+    if [ -f "$TELEMETRY_DIR/current-peak-memory.txt" ]; then
+        PEAK_MEMORY_USAGE=$(cat "$TELEMETRY_DIR/current-peak-memory.txt")
     fi
 
     if command -v yq >/dev/null 2>&1; then
