@@ -33,7 +33,7 @@ runs:
       shell: bash
       run: |
         sudo apt-get update
-        sudo apt-get install -y wget tar gzip
+        sudo apt-get install -y wget tar gzip jq
 
         # Install mikefarah/yq (Go-based, not Python yq from apt)
         YQ_VERSION="v4.48.1"
