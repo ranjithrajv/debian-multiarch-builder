@@ -7,8 +7,11 @@ build_architecture_parallel() {
     local build_arch=$1
     local log_file="build_${build_arch}.log"
 
+    echo "DEBUG: Starting build_architecture_parallel for $build_arch" >&2
+
     # Redirect all output to log file
     {
+        echo "DEBUG: Inside redirected block for $build_arch"
         if build_architecture "$build_arch"; then
             echo "SUCCESS" > "build_${build_arch}.status"
         else
@@ -16,6 +19,8 @@ build_architecture_parallel() {
             return 1
         fi
     } > "$log_file" 2>&1
+
+    echo "DEBUG: Finished build_architecture_parallel for $build_arch, exit code: $?" >&2
 }
 
 # Function to build all architectures sequentially
