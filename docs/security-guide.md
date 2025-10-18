@@ -34,4 +34,20 @@ Actual:   def456...
 The downloaded file may be corrupted or tampered with.
 ```
 
-This feature provides automatic supply chain security without any configuration required.
+### Lintian Integration
+
+Lintian is a tool that checks Debian packages for common errors and policy violations. By enabling Lintian integration, you can ensure that your packages are compliant with Debian policy and free of common errors.
+
+To enable Lintian integration, set the `lintian-check` input to `true` in your workflow file:
+
+```yaml
+- name: Build packages
+  uses: ranjithrajv/debian-multiarch-builder@v1
+  with:
+    config-file: 'package.yaml'
+    version: ${{ inputs.version }}
+    build-version: ${{ inputs.build_version }}
+    lintian-check: true
+```
+
+When Lintian integration is enabled, the action will run Lintian on each package that is built. If Lintian finds any errors, the build for that package will fail. The output of the Lintian check will be included in the build logs, and the results will be stored in the `build-summary.json` file.

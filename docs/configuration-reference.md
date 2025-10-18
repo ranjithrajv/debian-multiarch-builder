@@ -73,6 +73,24 @@ checksum:
 github_api_base_url: string    # Default: "https://api.github.com"
 ```
 
+### Lintian Check
+
+The `lintian-check` input enables Lintian integration for your builds. Lintian is a tool that checks Debian packages for common errors and policy violations.
+
+To enable Lintian integration, add the following to your workflow file:
+
+```yaml
+- name: Build packages
+  uses: ranjithrajv/debian-multiarch-builder@v1
+  with:
+    config-file: 'package.yaml'
+    version: ${{ inputs.version }}
+    build-version: ${{ inputs.build_version }}
+    lintian-check: true
+```
+
+When Lintian integration is enabled, the action will run Lintian on each package that is built. If Lintian finds any errors, the build for that package will fail.
+
 ### Max Parallel Configuration
 
 The `max_parallel` setting controls the number of concurrent architecture builds. It can be configured in multiple places, with the following order of precedence (from highest to lowest):

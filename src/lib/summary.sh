@@ -42,6 +42,9 @@ generate_build_summary() {
     # Get lintian summary
     local lintian_json=$(generate_lintian_summary)
 
+    # Get telemetry summary if available
+    local telemetry_json=$(get_telemetry_summary 2>/dev/null || echo "{}")
+
     # Generate build summary JSON
     cat > build-summary.json <<EOF
 {
@@ -61,7 +64,8 @@ generate_build_summary() {
   "parallel_builds": $PARALLEL_BUILDS,
   "max_parallel": $MAX_PARALLEL,
   "packages": $packages_json,
-  "lintian": $lintian_json
+  "lintian": $lintian_json,
+  "telemetry": $telemetry_json
 }
 EOF
 

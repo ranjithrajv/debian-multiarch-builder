@@ -24,12 +24,18 @@ build_architecture_parallel() {
     local log_file="build_${build_arch}.log"
     local start_time=$(date +%s)
 
+    # Record telemetry for this architecture build
+    record_build_stage "architecture_${build_arch}"
+
     # Redirect all output to log file
     {
         if build_architecture "$build_arch"; then
             echo "SUCCESS" > "build_${build_arch}.status"
+            record_build_stage_complete "architecture_${build_arch}" "success" "Architecture $build_arch built successfully"
         else
             echo "FAILED" > "build_${build_arch}.status"
+            record_build_stage_complete "architecture_${build_arch}" "failure" "Architecture $build_arch build failed"
+            record_build_failure "architecture_build" "Failed to build architecture $build_arch" "1"
             return 1
         fi
     } > "$log_file" 2>&1
