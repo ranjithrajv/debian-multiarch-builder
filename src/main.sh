@@ -11,6 +11,7 @@ source "$SCRIPT_DIR/lib/config.sh"
 source "$SCRIPT_DIR/lib/github-api.sh"
 source "$SCRIPT_DIR/lib/discovery.sh"
 source "$SCRIPT_DIR/lib/validation.sh"
+source "$SCRIPT_DIR/lib/lintian.sh"
 source "$SCRIPT_DIR/lib/build.sh"
 source "$SCRIPT_DIR/lib/orchestration.sh"
 source "$SCRIPT_DIR/lib/summary.sh"
@@ -47,6 +48,9 @@ check_requirements
 
 # Record build start time
 BUILD_START_TIME=$(date +%s)
+
+# Initialize lintian results tracking
+init_lintian_results
 
 info "Building $PACKAGE_NAME version $VERSION"
 info "GitHub repo: $GITHUB_REPO"
@@ -105,5 +109,9 @@ else
     generate_build_summary
 fi
 
-# Cleanup API cache files
+# Display lintian summary if enabled
+display_lintian_summary
+
+# Cleanup API cache files and lintian results
 cleanup_api_cache
+cleanup_lintian_results

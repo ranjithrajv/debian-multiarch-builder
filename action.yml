@@ -24,6 +24,10 @@ inputs:
     description: 'Maximum number of parallel builds (default: 2, recommended: 2-4 for GitHub runners)'
     required: false
     default: '2'
+  lintian-check:
+    description: 'Enable lintian validation of built packages (true/false)'
+    required: false
+    default: 'false'
 
 outputs:
   packages:
@@ -37,7 +41,7 @@ runs:
       shell: bash
       run: |
         sudo apt-get update
-        sudo apt-get install -y wget tar gzip jq curl
+        sudo apt-get install -y wget tar gzip jq curl lintian
 
         # Install mikefarah/yq (Go-based, not Python yq from apt)
         YQ_VERSION="v4.48.1"
@@ -62,6 +66,7 @@ runs:
         BUILD_VERSION: ${{ inputs.build-version }}
         ARCHITECTURE: ${{ inputs.architecture }}
         MAX_PARALLEL: ${{ inputs.max-parallel }}
+        LINTIAN_CHECK: ${{ inputs.lintian-check }}
         ACTION_PATH: ${{ github.action_path }}
       run: |
         echo "Starting multi-architecture build..."

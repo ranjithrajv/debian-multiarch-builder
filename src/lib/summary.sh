@@ -39,6 +39,9 @@ generate_build_summary() {
         size_human="${size_kb} KB"
     fi
 
+    # Get lintian summary
+    local lintian_json=$(generate_lintian_summary)
+
     # Generate build summary JSON
     cat > build-summary.json <<EOF
 {
@@ -57,7 +60,8 @@ generate_build_summary() {
   "build_end": "$(date '+%Y-%m-%dT%H:%M:%S%z')",
   "parallel_builds": $PARALLEL_BUILDS,
   "max_parallel": $MAX_PARALLEL,
-  "packages": $packages_json
+  "packages": $packages_json,
+  "lintian": $lintian_json
 }
 EOF
 

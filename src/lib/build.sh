@@ -35,6 +35,11 @@ build_distribution() {
         return 1
     fi
 
+    # Run lintian check on the built package
+    if ! run_lintian_check "./${PACKAGE_NAME}_${FULL_VERSION}.deb"; then
+        return 1
+    fi
+
     return 0
 }
 
