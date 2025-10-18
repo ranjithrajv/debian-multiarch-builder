@@ -5,6 +5,26 @@ set -e
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Error handling with telemetry
+handle_build_error() {
+    local exit_code=$?
+    local line_number=$1
+
+    # Record failure in telemetry
+    record_build_failure "script_execution" "Build failed at line $line_number with exit code $exit_code" "$exit_code"
+    finalize_telemetry
+
+    # Cleanup on error
+    cleanup_api_cache
+    cleanup_lintian_results
+
+    error "Build failed with exit code $exit_code at line $line_number"
+    exit $exit_code
+}
+
+# Set error trap
+trap 'handle_build_error $LINENO' ERR
+
 # Source all library modules
 source "$SCRIPT_DIR/lib/utils.sh"
 source "$SCRIPT_DIR/lib/config.sh"
@@ -12,6 +32,7 @@ source "$SCRIPT_DIR/lib/github-api.sh"
 source "$SCRIPT_DIR/lib/discovery.sh"
 source "$SCRIPT_DIR/lib/validation.sh"
 source "$SCRIPT_DIR/lib/lintian.sh"
+source "$SCRIPT_DIR/lib/telemetry.sh"
 source "$SCRIPT_DIR/lib/build.sh"
 source "$SCRIPT_DIR/lib/orchestration.sh"
 source "$SCRIPT_DIR/lib/summary.sh"
@@ -49,8 +70,14 @@ check_requirements
 # Record build start time
 BUILD_START_TIME=$(date +%s)
 
+# Initialize telemetry system
+init_telemetry
+
 # Initialize lintian results tracking
 init_lintian_results
+
+# Record build start telemetry
+record_build_stage "build_initialization"
 
 info "Building $PACKAGE_NAME version $VERSION"
 info "GitHub repo: $GITHUB_REPO"
@@ -107,6 +134,15 @@ else
     # Generate build summary JSON
     ARCHITECTURES=$ARCH
     generate_build_summary
+fi
+
+# Finalize telemetry collection
+record_build_stage_complete "build_completion" "success" "All builds completed successfully"
+finalize_telemetry
+
+# Save baseline if requested
+if [ "${SAVE_BASELINE:-false}" = "true" ]; then
+    save_as_baseline
 fi
 
 # Display lintian summary if enabled
