@@ -94,50 +94,150 @@ if [ "$ARCH" = "all" ]; then
     ARCH_ARRAY=($ARCHITECTURES)
     TOTAL_ARCHS=${#ARCH_ARRAY[@]}
 
+      BUILD_SUCCESS=false
     if [ "$PARALLEL_BUILDS" = "true" ]; then
-        build_all_architectures_parallel "${ARCH_ARRAY[@]}"
+        if build_all_architectures_parallel "${ARCH_ARRAY[@]}"; then
+            BUILD_SUCCESS=true
+        fi
     else
         # Sequential builds (original behavior)
-        build_architecture_sequential "${ARCH_ARRAY[@]}"
+        if build_architecture_sequential "${ARCH_ARRAY[@]}"; then
+            BUILD_SUCCESS=true
+        fi
     fi
 
-    echo ""
-    echo "=========================================="
-    echo "🎉 All architectures built successfully!"
-    echo "=========================================="
-    echo ""
-    echo "Generated packages:"
-    ls -lh ${PACKAGE_NAME}_*.deb | awk '{print "  " $9 " (" $5 ")"}'
-    echo ""
-    TOTAL_PACKAGES=$(ls ${PACKAGE_NAME}_*.deb 2>/dev/null | wc -l)
-    echo "✅ Total: $TOTAL_PACKAGES packages"
+    # Check if builds actually succeeded before showing success message
+    if [ "$BUILD_SUCCESS" = "true" ]; then
+        # Verify we actually have packages built
+        TOTAL_PACKAGES=$(ls ${PACKAGE_NAME}_*.deb 2>/dev/null | wc -l)
+        if [ "$TOTAL_PACKAGES" -gt 0 ]; then
+            echo ""
+            echo "=========================================="
+            echo "🎉 All architectures built successfully!"
+            echo "=========================================="
+            echo ""
+            echo "Generated packages:"
+            ls -lh ${PACKAGE_NAME}_*.deb | awk '{print "  " $9 " (" $5 ")"}'
+            echo ""
+            echo "✅ Total: $TOTAL_PACKAGES packages"
 
-    # Generate build summary JSON
-    generate_build_summary
+            # Generate build summary JSON
+            generate_build_summary
+
+            # Record successful completion in telemetry
+            record_build_stage_complete "build_completion" "success" "All builds completed successfully"
+        else
+            # Build functions returned success but no packages were created
+            echo ""
+            echo "=========================================="
+            echo "❌ Build completed but no packages were generated!"
+            echo "=========================================="
+            echo ""
+            echo "This may indicate an issue with the build process."
+
+            # Record failure in telemetry
+            record_build_failure "build_validation" "Build completed but no packages were generated" "1"
+
+            # Generate build summary JSON showing failure
+            generate_build_summary
+
+            exit 1
+        fi
+    else
+        # Build failed - don't show success message
+        echo ""
+        echo "=========================================="
+        echo "❌ Build failed during architecture processing!"
+        echo "=========================================="
+        echo ""
+        TOTAL_PACKAGES=$(ls ${PACKAGE_NAME}_*.deb 2>/dev/null | wc -l)
+        if [ "$TOTAL_PACKAGES" -gt 0 ]; then
+            echo "Some packages were generated before failure:"
+            ls -lh ${PACKAGE_NAME}_*.deb | awk '{print "  " $9 " (" $5 ")"}'
+            echo ""
+            echo "⚠️  Partial: $TOTAL_PACKAGES packages (build incomplete)"
+        else
+            echo "No packages were generated."
+        fi
+
+        # Generate build summary JSON showing failure
+        generate_build_summary
+
+        # The error should already be recorded by the build functions
+        exit 1
+    fi
 else
     # Build for single architecture
     echo "Building for single architecture: $ARCH"
     echo ""
 
-    if ! build_architecture "$ARCH"; then
+    BUILD_SUCCESS=false
+    if build_architecture "$ARCH"; then
+        BUILD_SUCCESS=true
+    fi
+
+    if [ "$BUILD_SUCCESS" = "true" ]; then
+        # Verify we actually have packages built
+        TOTAL_PACKAGES=$(ls ${PACKAGE_NAME}_*.deb 2>/dev/null | wc -l)
+        if [ "$TOTAL_PACKAGES" -gt 0 ]; then
+            echo ""
+            echo "Generated packages:"
+            ls -lh ${PACKAGE_NAME}_*.deb | awk '{print "  " $9 " (" $5 ")"}'
+            echo ""
+            echo "✅ Total: $TOTAL_PACKAGES packages"
+
+            # Generate build summary JSON
+            ARCHITECTURES=$ARCH
+            generate_build_summary
+
+            # Record successful completion in telemetry
+            record_build_stage_complete "build_completion" "success" "Single architecture build completed successfully"
+        else
+            # Build returned success but no packages were created
+            echo ""
+            echo "=========================================="
+            echo "❌ Build completed but no packages were generated!"
+            echo "=========================================="
+            echo ""
+            echo "This may indicate an issue with the build process for architecture: $ARCH"
+
+            # Record failure in telemetry
+            record_build_failure "build_validation" "Build completed but no packages were generated for $ARCH" "1"
+
+            # Generate build summary JSON showing failure
+            ARCHITECTURES=$ARCH
+            generate_build_summary
+
+            cleanup_api_cache
+            exit 1
+        fi
+    else
+        # Build failed
+        echo ""
+        echo "=========================================="
+        echo "❌ Build failed for architecture: $ARCH!"
+        echo "=========================================="
+        echo ""
+        TOTAL_PACKAGES=$(ls ${PACKAGE_NAME}_*.deb 2>/dev/null | wc -l)
+        if [ "$TOTAL_PACKAGES" -gt 0 ]; then
+            echo "Some packages were generated before failure:"
+            ls -lh ${PACKAGE_NAME}_*.deb | awk '{print "  " $9 " (" $5 ")"}'
+            echo ""
+            echo "⚠️  Partial: $TOTAL_PACKAGES packages (build incomplete)"
+        else
+            echo "No packages were generated."
+        fi
+
+        # Generate build summary JSON showing failure
+        ARCHITECTURES=$ARCH
+        generate_build_summary
+
         cleanup_api_cache
         exit 1
     fi
-
-    echo ""
-    echo "Generated packages:"
-    ls -lh ${PACKAGE_NAME}_*.deb | awk '{print "  " $9 " (" $5 ")"}'
-    echo ""
-    TOTAL_PACKAGES=$(ls ${PACKAGE_NAME}_*.deb 2>/dev/null | wc -l)
-    echo "✅ Total: $TOTAL_PACKAGES packages"
-
-    # Generate build summary JSON
-    ARCHITECTURES=$ARCH
-    generate_build_summary
 fi
 
-# Finalize telemetry collection
-record_build_stage_complete "build_completion" "success" "All builds completed successfully"
+# Finalize telemetry collection (success cases already recorded stage completion)
 finalize_telemetry
 
 # Save baseline if requested
