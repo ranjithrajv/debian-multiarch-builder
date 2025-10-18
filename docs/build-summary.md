@@ -1,6 +1,23 @@
 # Build Summary
 
-The action automatically generates a `build-summary.json` file containing comprehensive build metadata for easy integration with CI/CD pipelines and automation tools.
+The action automatically generates a `build-summary.json` file containing comprehensive build metadata. Here's a detailed explanation of each field:
+
+*   `package`: The name of the package.
+*   `version`: The version of the software being built.
+*   `build_version`: The Debian build version.
+*   `full_version`: The full version string, in the format `version-build_version`.
+*   `github_repo`: The GitHub repository from which the software was downloaded.
+*   `architectures`: A list of the architectures for which the package was built.
+*   `distributions`: A list of the distributions for which the package was built.
+*   `total_packages`: The total number of packages that were built.
+*   `total_size_bytes`: The total size of all the packages, in bytes.
+*   `total_size_human`: The total size of all the packages, in a human-readable format (e.g., "315 MB").
+*   `build_duration_seconds`: The duration of the build, in seconds.
+*   `build_start`: The timestamp of when the build started.
+*   `build_end`: The timestamp of when the build ended.
+*   `parallel_builds`: A boolean value indicating whether parallel builds were enabled.
+*   `max_parallel`: The maximum number of parallel builds.
+*   `packages`: A list of the packages that were built, with their names and sizes.
 
 **Example output:**
 ```json
