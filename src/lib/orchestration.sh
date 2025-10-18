@@ -7,25 +7,42 @@ build_architecture_parallel() {
     # Disable exit-on-error for backgrounded function
     set +e
 
-    local build_arch=$1
-    local log_file="build_${build_arch}.log"
+    echo "DEBUG: [parallel] Entered function for $1" >&2
 
-    echo "DEBUG: Starting build_architecture_parallel for $build_arch" >&2
+    local build_arch=$1
+    echo "DEBUG: [parallel] Set build_arch=$build_arch" >&2
+
+    local log_file="build_${build_arch}.log"
+    echo "DEBUG: [parallel] Set log_file=$log_file" >&2
+
+    echo "DEBUG: [parallel] About to start redirected block" >&2
+
+    # Test if we can write to log file
+    if echo "Test write at $(date)" > "$log_file" 2>&1; then
+        echo "DEBUG: [parallel] Successfully created/wrote to $log_file" >&2
+    else
+        echo "ERROR: [parallel] Failed to create/write to $log_file" >&2
+        return 1
+    fi
 
     # Redirect all output to log file
     {
         echo "DEBUG: Inside redirected block for $build_arch"
+        echo "DEBUG: About to call build_architecture"
+
         if build_architecture "$build_arch"; then
+            echo "DEBUG: build_architecture succeeded"
             echo "SUCCESS" > "build_${build_arch}.status"
         else
+            echo "DEBUG: build_architecture failed with exit code $?"
             echo "FAILED" > "build_${build_arch}.status"
             return 1
         fi
     } > "$log_file" 2>&1
 
     local exit_code=$?
-
-    echo "DEBUG: Finished build_architecture_parallel for $build_arch, exit code: $exit_code" >&2
+    echo "DEBUG: [parallel] Finished redirected block, exit_code=$exit_code" >&2
+    echo "DEBUG: [parallel] Returning $exit_code" >&2
     return $exit_code
 }
 
