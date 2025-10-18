@@ -55,3 +55,15 @@ checksum:
 github_api_base_url: "https://api.github.com"
 # For GitHub Enterprise, override with:
 # github_api_base_url: "https://github.example.com/api/v3"
+
+# Lintian validation
+lintian:
+  enabled: false           # Controlled by action input
+  fail_on_errors: true     # Fail build if lintian reports errors
+  fail_on_warnings: false  # Continue build even with warnings
+  pedantic: false          # Enable pedantic checks
+  display_level: "info"    # Minimum severity to display: info, warning, error
+  suppress_tags: []        # List of lintian tags to ignore
+  # Common tags to suppress (examples):
+  # - new-package-should-close-itp-bug
+  # - changelog-file-missing-in-native-package
