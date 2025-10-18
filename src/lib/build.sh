@@ -43,8 +43,6 @@ build_architecture() {
     local build_arch=$1
     local release_pattern
 
-    echo "DEBUG: Entered build_architecture for $build_arch" >&2
-
     release_pattern=$(get_release_pattern "$build_arch")
     if [ $? -ne 0 ]; then
         error "Architecture '$build_arch' not found in config or has no release_pattern"
