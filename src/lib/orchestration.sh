@@ -4,6 +4,9 @@
 
 # Function to build architecture with logging to file (for parallel builds)
 build_architecture_parallel() {
+    # Disable exit-on-error for backgrounded function
+    set +e
+
     local build_arch=$1
     local log_file="build_${build_arch}.log"
 
@@ -20,7 +23,10 @@ build_architecture_parallel() {
         fi
     } > "$log_file" 2>&1
 
-    echo "DEBUG: Finished build_architecture_parallel for $build_arch, exit code: $?" >&2
+    local exit_code=$?
+
+    echo "DEBUG: Finished build_architecture_parallel for $build_arch, exit code: $exit_code" >&2
+    return $exit_code
 }
 
 # Function to build all architectures sequentially
