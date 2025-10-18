@@ -133,16 +133,16 @@ if [ "$ARCH" = "all" ]; then
             echo "=========================================="
 
             # Calculate actual attempted vs built based on detected available architectures
-            local attempted_archs=$(cat /tmp/attempted_architectures.txt 2>/dev/null | wc -l || echo 0)
-            local skipped_archs=$(cat /tmp/skipped_architectures.txt 2>/dev/null | wc -l || echo 0)
-            local available_archs=$(cat /tmp/available_architectures.txt 2>/dev/null | wc -l || echo 0)
+            attempted_archs=$(cat /tmp/attempted_architectures.txt 2>/dev/null | wc -l || echo 0)
+            skipped_archs=$(cat /tmp/skipped_architectures.txt 2>/dev/null | wc -l || echo 0)
+            available_archs=$(cat /tmp/available_architectures.txt 2>/dev/null | wc -l || echo 0)
 
             # Calculate target packages based on available architectures and their distribution support
-            local attempted_packages=0
+            attempted_packages=0
             for arch in $(cat /tmp/attempted_architectures.txt 2>/dev/null); do
                 # Get distribution support for this architecture
-                local dists=$(is_arch_supported_for_dist "$arch" "bookworm trixie forky sid")
-                local supported_count=$(echo "$dists" | wc -l)
+                dists=$(is_arch_supported_for_dist "$arch" "bookworm trixie forky sid")
+                supported_count=$(echo "$dists" | wc -l)
                 attempted_packages=$((attempted_packages + supported_count))
             done
 
@@ -179,13 +179,13 @@ if [ "$ARCH" = "all" ]; then
             fi
 
             # Show which architectures succeeded
-            local built_archs=$(ls ${PACKAGE_NAME}_*.deb 2>/dev/null | sed "s/.*${PACKAGE_NAME}_.*+\([^-]*\)_.*\.deb/\1/" | sort -u)
+            built_archs=$(ls ${PACKAGE_NAME}_*.deb 2>/dev/null | sed "s/.*${PACKAGE_NAME}_.*+\([^-]*\)_.*\.deb/\1/" | sort -u)
             if [ -n "$built_archs" ]; then
                 echo "  ✅ Successful Architectures: $built_archs"
             fi
 
             # Show which architectures failed (if any)
-            local failed_archs=""
+            failed_archs=""
             for arch in $ARCHITECTURES; do
                 if ! echo "$built_archs" | grep -q "$arch"; then
                     failed_archs="$failed_archs $arch"
