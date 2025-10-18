@@ -21,9 +21,9 @@ inputs:
     required: false
     default: 'all'
   max-parallel:
-    description: 'Maximum number of parallel builds (default: 2, recommended: 2-4 for GitHub runners)'
+    description: 'Maximum number of parallel builds (default: 4, recommended: 2-4 for GitHub runners)'
     required: false
-    default: '2'
+    default: '4'
   lintian-check:
     description: 'Enable Lintian check for Debian packages'
     required: false
