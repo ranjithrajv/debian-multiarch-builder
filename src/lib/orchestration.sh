@@ -78,7 +78,19 @@ build_all_architectures_parallel() {
     local arch_array=("$@")
     local total_archs=${#arch_array[@]}
 
-    echo "⚡ Parallel builds enabled (max: $MAX_PARALLEL concurrent)"
+    # Apply graceful degradation based on current system resources
+    source "$SCRIPT_DIR/ci-optimization.sh"
+
+    local current_memory_mb=$(free -m 2>/dev/null | awk '/^Mem:/{print $7}' || echo "2048")
+    local current_cores=$(nproc 2>/dev/null || echo "2")
+    local adjusted_parallel=$(apply_graceful_degradation "$MAX_PARALLEL" "$current_memory_mb" "$current_cores")
+
+    if [ "$adjusted_parallel" -ne "$MAX_PARALLEL" ]; then
+        info "Resource-aware adjustment: Using $adjusted_parallel parallel jobs (was $MAX_PARALLEL)"
+        MAX_PARALLEL=$adjusted_parallel
+    fi
+
+    echo "⚡ Parallel builds enabled (max: $MAX_PARALLEL concurrent, resource-aware)"
     echo ""
 
     declare -a pids=()

@@ -34,6 +34,15 @@ export SYSTEM_SNAPSHOT=""  # System state at failure time
 export NETWORK_CONDITIONS=""  # Network status at failure
 export ENVIRONMENT_DETAILS=""  # Build environment context
 export DIAGNOSTIC_DATA=""  # Auto-collected diagnostic info
+
+# State tracking variables
+export BUILD_STATE_FILE="$TELEMETRY_DIR/build-state.json"
+export ARCHITECTURE_STATE=""  # Track per-architecture state
+export DISTRIBUTION_STATE=""  # Track per-distribution state
+export COMPLETED_BUILDS=""  # Track successfully completed builds
+export FAILED_BUILDS=""  # Track failed builds
+export PENDING_BUILDS=""  # Track builds that need to be attempted
+export SKIPPED_BUILDS=""  # Track builds that were skipped
 export PERFORMANCE_REGRESSIONS=()
 
 # Network tracking
@@ -923,6 +932,252 @@ collect_diagnostic_data() {
   }
 }"
 }
+
+# Initialize build state tracking
+initialize_build_state() {
+    local architectures="$1"
+    local distributions="$2"
+
+    if [ "$TELEMETRY_ENABLED" != "true" ]; then
+        return 0
+    fi
+
+    local timestamp=$(date -Iseconds)
+    local build_id="${PACKAGE_NAME}-${VERSION}-${BUILD_VERSION}-$(date +%s)"
+
+    # Create initial state structure
+    local initial_state="{
+  \"build_id\": \"$build_id\",
+  \"timestamp\": \"$timestamp\",
+  \"package_name\": \"${PACKAGE_NAME:-unknown}\",
+  \"version\": \"${VERSION:-unknown}\",
+  \"build_version\": \"${BUILD_VERSION:-unknown}\",
+  \"github_repo\": \"${GITHUB_REPO:-unknown}\",
+  \"architectures\": [$(echo "$architectures" | sed 's/[^ ]\+/"&"/g' | tr ' ' ',' | sed 's/,$//')],
+  \"distributions\": [$(echo "$distributions" | sed 's/[^ ]\+/"&"/g' | tr ' ' ',' | sed 's/,$//')],
+  \"state\": \"initializing\",
+  \"started_at\": \"$timestamp\",
+  \"completed_at\": null,
+  \"build_progress\": {
+    \"total_packages\": 0,
+    \"completed_packages\": 0,
+    \"failed_packages\": 0,
+    \"skipped_packages\": 0,
+    \"pending_packages\": 0
+  },
+  \"architecture_states\": {},
+  \"completed_builds\": [],
+  \"failed_builds\": [],
+  \"skipped_builds\": [],
+  \"pending_builds\": [],
+  \"build_details\": {}
+}"
+
+    # Initialize per-architecture states
+    local arch_array=($architectures)
+    local dist_array=($distributions)
+
+    for arch in "${arch_array[@]}"; do
+        for dist in "${dist_array[@]}"; do
+            if is_arch_supported_for_dist "$arch" "$dist"; then
+                initial_state=$(echo "$initial_state" | jq --arg arch "$arch" --arg dist "$dist" '
+                    .architecture_states[$arch][$dist] = {
+                        "state": "pending",
+                        "started_at": null,
+                        "completed_at": null,
+                        "status": "pending",
+                        "attempt_count": 0,
+                        "last_attempt": null,
+                        "output_files": [],
+                        "log_file": null,
+                        "error_details": null
+                    } |
+                    .pending_builds += [{"architecture": $arch, "distribution": $dist}]
+                ')
+            fi
+        done
+    done
+
+    # Update total packages count
+    initial_state=$(echo "$initial_state" | jq '
+        .build_progress.total_packages = (.pending_builds | length)
+    ')
+
+    # Save initial state
+    echo "$initial_state" > "$BUILD_STATE_FILE"
+    info "Build state initialized with $(echo "$initial_state" | jq '.build_progress.total_packages') packages to build"
+
+    # Export state variables for easy access
+    PENDING_BUILDS=$(echo "$initial_state" | jq -r '.pending_builds | length')
+    COMPLETED_BUILDS="0"
+    FAILED_BUILDS="0"
+    SKIPPED_BUILDS="0"
+}
+
+# Update build state for architecture/distribution
+update_build_state() {
+    local arch="$1"
+    local dist="$2"
+    local status="$3"  # started, completed, failed, skipped
+    local details="$4"  # Optional error details or additional info
+
+    if [ "$TELEMETRY_ENABLED" != "true" ] || [ ! -f "$BUILD_STATE_FILE" ]; then
+        return 0
+    fi
+
+    local timestamp=$(date -Iseconds)
+    local state_update=""
+
+    case "$status" in
+        "started")
+            state_update=$(jq --arg arch "$arch" --arg dist "$dist" --arg timestamp "$timestamp" '
+                .architecture_states[$arch][$dist].state = "building" |
+                .architecture_states[$arch][$dist].started_at = $timestamp |
+                .architecture_states[$arch][$dist].status = "building" |
+                .architecture_states[$arch][$dist].attempt_count += 1 |
+                .architecture_states[$arch][$dist].last_attempt = $timestamp
+            ' "$BUILD_STATE_FILE")
+            ;;
+        "completed")
+            state_update=$(jq --arg arch "$arch" --arg dist "$dist" --arg timestamp "$timestamp" '
+                .architecture_states[$arch][$dist].state = "completed" |
+                .architecture_states[$arch][$dist].completed_at = $timestamp |
+                .architecture_states[$arch][$dist].status = "completed" |
+                .completed_builds += [{"architecture": $arch, "distribution": $dist, "completed_at": $timestamp}]
+            ' "$BUILD_STATE_FILE")
+            ;;
+        "failed")
+            state_update=$(jq --arg arch "$arch" --arg dist "$dist" --arg timestamp "$timestamp" --arg details "$details" '
+                .architecture_states[$arch][$dist].state = "failed" |
+                .architecture_states[$arch][$dist].completed_at = $timestamp |
+                .architecture_states[$arch][$dist].status = "failed" |
+                .architecture_states[$arch][$dist].error_details = $details |
+                .failed_builds += [{"architecture": $arch, "distribution": $dist, "failed_at": $timestamp, "error": $details}]
+            ' "$BUILD_STATE_FILE")
+            ;;
+        "skipped")
+            state_update=$(jq --arg arch "$arch" --arg dist "$dist" --arg timestamp "$timestamp" --arg details "$details" '
+                .architecture_states[$arch][$dist].state = "skipped" |
+                .architecture_states[$arch][$dist].completed_at = $timestamp |
+                .architecture_states[$arch][$dist].status = "skipped" |
+                .architecture_states[$arch][$dist].error_details = $details |
+                .skipped_builds += [{"architecture": $arch, "distribution": $dist, "skipped_at": $timestamp, "reason": $details}]
+            ' "$BUILD_STATE_FILE")
+            ;;
+    esac
+
+    # Remove from pending builds and update counts
+    state_update=$(echo "$state_update" | jq --arg arch "$arch" --arg dist "$dist" '
+        .pending_builds = [.pending_builds[] | select(.architecture != $arch or .distribution != $dist)] |
+        .build_progress.completed_packages = (.completed_builds | length) |
+        .build_progress.failed_packages = (.failed_builds | length) |
+        .build_progress.skipped_packages = (.skipped_builds | length) |
+        .build_progress.pending_packages = (.pending_builds | length)
+    ')
+
+    # Update overall state if all builds are done
+    local total_done=$(echo "$state_update" | jq '(.completed_builds | length) + (.failed_builds | length) + (.skipped_builds | length)')
+    local total_packages=$(echo "$state_update" | jq '.build_progress.total_packages')
+
+    if [ "$total_done" -eq "$total_packages" ]; then
+        local final_state="completed"
+        if [ "$(echo "$state_update" | jq '.failed_builds | length')" -gt 0 ]; then
+            final_state="completed_with_failures"
+        fi
+        state_update=$(echo "$state_update" | jq --arg final_state "$final_state" --arg timestamp "$timestamp" '
+            .state = $final_state |
+            .completed_at = $timestamp
+        ')
+    fi
+
+    echo "$state_update" > "$BUILD_STATE_FILE"
+
+    # Update exported variables
+    PENDING_BUILDS=$(echo "$state_update" | jq -r '.build_progress.pending_packages')
+    COMPLETED_BUILDS=$(echo "$state_update" | jq -r '.build_progress.completed_packages')
+    FAILED_BUILDS=$(echo "$state_update" | jq -r '.build_progress.failed_packages')
+    SKIPPED_BUILDS=$(echo "$state_update" | jq -r '.build_progress.skipped_packages')
+}
+
+# Get current build state summary
+get_build_state_summary() {
+    if [ "$TELEMETRY_ENABLED" != "true" ] || [ ! -f "$BUILD_STATE_FILE" ]; then
+        echo "{}"
+        return 0
+    fi
+
+    jq '{
+        build_id: .build_id,
+        package_name: .package_name,
+        version: .version,
+        state: .state,
+        progress: .build_progress,
+        architecture_count: (.architectures | length),
+        distribution_count: (.distributions | length),
+        started_at: .started_at,
+        completed_at: .completed_at,
+        recent_activity: (.completed_builds[-3:] + .failed_builds[-3:] + .skipped_builds[-3:]),
+        pending_count: (.pending_builds | length),
+        architecture_states: .architecture_states
+    }' "$BUILD_STATE_FILE"
+}
+
+# Display build state summary
+display_build_state_summary() {
+    if [ "$TELEMETRY_ENABLED" != "true" ] || [ ! -f "$BUILD_STATE_FILE" ]; then
+        return 0
+    fi
+
+    local summary=$(get_build_state_summary)
+    local state=$(echo "$summary" | jq -r '.state')
+    local total=$(echo "$summary" | jq -r '.progress.total_packages')
+    local completed=$(echo "$summary" | jq -r '.progress.completed_packages')
+    local failed=$(echo "$summary" | jq -r '.progress.failed_packages')
+    local skipped=$(echo "$summary" | jq -r '.progress.skipped_packages')
+    local pending=$(echo "$summary" | jq -r '.progress.pending_packages')
+    local progress_pct=0
+
+    if [ "$total" -gt 0 ]; then
+        progress_pct=$(( (completed + failed + skipped) * 100 / total ))
+    fi
+
+    echo ""
+    echo "📊 BUILD STATE SUMMARY"
+    echo "=========================================="
+    echo "🔍 State: $state"
+    echo "📦 Total Packages: $total"
+    echo "✅ Completed: $completed"
+    echo "❌ Failed: $failed"
+    echo "⏭️  Skipped: $skipped"
+    echo "⏳ Pending: $pending"
+    echo "📈 Progress: $progress_pct%"
+    echo ""
+
+    if [ "$pending" -gt 0 ]; then
+        echo "🔄 PENDING BUILDS:"
+        echo "$summary" | jq -r '.pending_builds[] | "   • \(.architecture)/\(.distribution)"' | head -10
+        if [ "$pending" -gt 10 ]; then
+            echo "   ... and $((pending - 10)) more"
+        fi
+        echo ""
+    fi
+
+    if [ "$failed" -gt 0 ]; then
+        echo "❌ FAILED BUILDS:"
+        echo "$summary" | jq -r '.failed_builds[-5:][] | "   • \(.architecture)/\(.distribution): \(.error // "unknown error")"' | head -5
+        echo ""
+    fi
+
+    echo "📄 Detailed state file: $BUILD_STATE_FILE"
+    echo "=========================================="
+    echo ""
+}
+
+# Export state tracking functions
+export -f initialize_build_state
+export -f update_build_state
+export -f get_build_state_summary
+export -f display_build_state_summary
 
 # Enhanced record failure with retry logic
 record_build_failure_with_retry() {

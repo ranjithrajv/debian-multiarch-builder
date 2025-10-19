@@ -11,11 +11,28 @@ parallel_builds:
   # Build multiple architectures in parallel
   architectures:
     enabled: true
-    max_concurrent: 2    # Suitable for GitHub Actions (2 CPU cores)
+    max_concurrent: 2    # Auto-optimized based on CI environment detection
 
   # Build multiple distributions in parallel (per architecture)
   distributions:
     enabled: true        # Enabled by default for faster builds
+
+# CI/CD Optimization settings
+ci_optimization:
+  # Auto-detect CI environment and optimize accordingly
+  enabled: true
+  # Apply resource-based limits in CI environments
+  resource_based_limits: true
+  # Graceful degradation for limited resources
+  graceful_degradation: true
+  # Minimum memory per parallel job (MB)
+  min_memory_per_job: 1024
+  # Minimum CPU cores per parallel job
+  min_cores_per_job: 1
+  # Reserve resources for CI infrastructure overhead
+  ci_overhead_reserve:
+    memory_mb: 1024     # 1GB for CI infrastructure
+    cpu_cores: 1        # 1 core for CI infrastructure
 
 # Build orchestration
 polling_interval_seconds: 1  # How often to check for completed builds

@@ -18,6 +18,10 @@ parse_config() {
     local config_file=$1
     local config_dir=$(dirname "$config_file")
 
+    # Initialize CI environment detection first
+    source "$SCRIPT_DIR/ci-optimization.sh"
+    init_ci_optimization
+
     # New split configuration: package.yaml + optional overrides.yaml
     local package_file="$config_file"
     local overrides_file="$config_dir/overrides.yaml"
@@ -68,8 +72,24 @@ parse_config() {
         fi
     fi
 
-    # Ensure MAX_PARALLEL has a default value
-    MAX_PARALLEL=${MAX_PARALLEL:-2}
+    # Apply CI optimizations to MAX_PARALLEL
+    if [ -z "$MAX_PARALLEL" ]; then
+        # Use CI-optimized defaults if not specified
+        MAX_PARALLEL=$(apply_ci_optimizations "2")
+    else
+        # Apply resource-based limits to user-specified value
+        MAX_PARALLEL=$(apply_ci_optimizations "$MAX_PARALLEL")
+    fi
+
+    info "Parallel build configuration: $MAX_PARALLEL concurrent jobs (CI-optimized)"
+
+    # Validate build environment
+    validate_build_environment
+
+    # Generate CI environment report if in CI
+    if [ "$IS_CI_ENVIRONMENT" = "true" ]; then
+        generate_ci_environment_report
+    fi
 
     # Validate required fields
     if [ "$PACKAGE_NAME" = "null" ] || [ -z "$PACKAGE_NAME" ]; then
