@@ -141,8 +141,12 @@ if [ "$ARCH" = "all" ]; then
             attempted_packages=0
             for arch in $(cat /tmp/attempted_architectures.txt 2>/dev/null); do
                 # Get distribution support for this architecture
-                dists=$(is_arch_supported_for_dist "$arch" "bookworm trixie forky sid")
-                supported_count=$(echo "$dists" | wc -l)
+                supported_count=0
+                for dist in "bookworm" "trixie" "forky" "sid"; do
+                    if is_arch_supported_for_dist "$arch" "$dist"; then
+                        supported_count=$((supported_count + 1))
+                    fi
+                done
                 attempted_packages=$((attempted_packages + supported_count))
             done
 
