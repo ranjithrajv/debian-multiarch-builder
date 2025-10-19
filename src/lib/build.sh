@@ -31,7 +31,7 @@ build_distribution() {
         fi
 
         # Record detailed failure in telemetry
-        record_build_failure "docker_build" "$docker_error" "1"
+        record_build_failure "docker_build" "$docker_error" "1" "$build_arch" "$dist"
 
         # Add context-specific failure details
         add_failure_detail "Docker build failed for architecture: ${build_arch}, distribution: ${dist}"
@@ -40,19 +40,19 @@ build_distribution() {
         # Extract specific error patterns for better categorization
         if echo "$docker_error" | grep -qi -E "(no such file|not found|file.*missing)"; then
             add_failure_detail "Missing files or dependencies detected in Docker build"
-            record_build_failure "docker_build" "Missing files or dependencies in Docker build: $docker_error" "1"
+            record_build_failure "docker_build" "Missing files or dependencies in Docker build: $docker_error" "1" "$build_arch" "$dist"
         elif echo "$docker_error" | grep -qi -E "(permission|denied|access)"; then
             add_failure_detail "Permission error during Docker build"
-            record_build_failure "docker_build" "Permission error in Docker build: $docker_error" "1"
+            record_build_failure "docker_build" "Permission error in Docker build: $docker_error" "1" "$build_arch" "$dist"
         elif echo "$docker_error" | grep -qi -E "(memory|disk|space|resource)"; then
             add_failure_detail "Resource constraint during Docker build"
-            record_build_failure "docker_build" "Resource constraint in Docker build: $docker_error" "1"
+            record_build_failure "docker_build" "Resource constraint in Docker build: $docker_error" "1" "$build_arch" "$dist"
         elif echo "$docker_error" | grep -qi -E "(network|connection|timeout|download)"; then
             add_failure_detail "Network issue during Docker build"
-            record_build_failure "docker_build" "Network issue in Docker build: $docker_error" "1"
+            record_build_failure "docker_build" "Network issue in Docker build: $docker_error" "1" "$build_arch" "$dist"
         else
             add_failure_detail "General Docker build failure"
-            record_build_failure "docker_build" "Docker build error: $docker_error" "1"
+            record_build_failure "docker_build" "Docker build error: $docker_error" "1" "$build_arch" "$dist"
         fi
 
         # Add build environment details

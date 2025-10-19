@@ -22,6 +22,9 @@ export NETWORK_BYTES_UPLOADED=0
 export BUILD_FAILURE_CATEGORY=""
 export FAILURE_TYPE=""  # transient or permanent
 export FAILURE_DETAILS=""
+export FAILURE_CATEGORY_ENHANCED=""  # Enhanced category with remediation
+export REMEDIATION_SUGGESTIONS=""
+export DETAILED_FAILURE_REPORT=""
 export RETRY_COUNT=0
 export PERFORMANCE_REGRESSIONS=()
 
@@ -89,6 +92,8 @@ init_telemetry() {
     "failure_code": 0,
     "failure_type": "",
     "failure_details_summary": "",
+    "failure_category_enhanced": "",
+    "remediation_suggestions": "",
     "retry_count": 0,
     "last_retry_attempt": "",
     "packages_built": 0,
@@ -336,33 +341,67 @@ record_build_stage_complete() {
     info "Telemetry: Completed stage - $stage_name ($stage_status)"
 }
 
-# Record build failure with categorization
+# Record build failure with enhanced categorization and detailed reporting
 record_build_failure() {
     local failure_stage="$1"
     local failure_reason="$2"
     local error_code="$3"
+    local arch="${4:-unknown}"
+    local dist="${5:-unknown}"
 
     if [ "$TELEMETRY_ENABLED" != "true" ]; then
         return 0
     fi
 
+    # Basic categorization (existing)
     BUILD_FAILURE_CATEGORY=$(categorize_failure "$failure_stage" "$failure_reason" "$error_code")
 
-    # Update telemetry
-    update_telemetry_field "build_metrics.failure_category" "$BUILD_FAILURE_CATEGORY"
-    update_telemetry_field "build_metrics.failure_stage" "$failure_stage"
-    update_telemetry_field "build_metrics.failure_reason" "$failure_reason"
-    update_telemetry_field "build_metrics.failure_code" "$error_code"
+    # Enhanced categorization with remediation
+    categorize_failure_enhanced "$failure_stage" "$failure_reason" "$error_code"
 
     # Classify failure as transient or permanent
     classify_failure_type "$failure_stage" "$failure_reason" "$error_code"
 
-    # Update telemetry with failure classification
+    # Generate detailed failure report
+    generate_detailed_failure_report "$failure_stage" "$failure_reason" "$error_code" "$arch" "$dist"
+
+    # Update telemetry with all failure information
+    update_telemetry_field "build_metrics.failure_category" "$BUILD_FAILURE_CATEGORY"
+    update_telemetry_field "build_metrics.failure_stage" "$failure_stage"
+    update_telemetry_field "build_metrics.failure_reason" "$failure_reason"
+    update_telemetry_field "build_metrics.failure_code" "$error_code"
     update_telemetry_field "build_metrics.failure_type" "$FAILURE_TYPE"
     update_telemetry_field "build_metrics.failure_details" "$FAILURE_DETAILS"
     update_telemetry_field "build_metrics.retry_count" "$RETRY_COUNT"
+    update_telemetry_field "build_metrics.failure_category_enhanced" "$FAILURE_CATEGORY_ENHANCED"
+    update_telemetry_field "build_metrics.remediation_suggestions" "$REMEDIATION_SUGGESTIONS"
 
-    warning "Telemetry: Build failure categorized as $BUILD_FAILURE_CATEGORY ($FAILURE_TYPE)"
+    # Save detailed failure report to file
+    if [ -n "$DETAILED_FAILURE_REPORT" ]; then
+        echo "$DETAILED_FAILURE_REPORT" > "$TELEMETRY_DIR/failure-report.json"
+        info "Detailed failure report saved to $TELEMETRY_DIR/failure-report.json"
+    fi
+
+    # Display enhanced failure information
+    echo ""
+    echo "=========================================="
+    echo "❌ ENHANCED FAILURE ANALYSIS"
+    echo "=========================================="
+    echo "📊 Failure Category: $FAILURE_CATEGORY_ENHANCED"
+    echo "🏷️  Failure Type: $FAILURE_TYPE"
+    echo "📍 Stage: $failure_stage"
+    echo "🔧 Architecture: $arch, Distribution: $dist"
+    echo ""
+    echo "💡 REMEDIATION SUGGESTIONS:"
+    echo "$REMEDIATION_SUGGESTIONS" | while IFS= read -r line; do
+        echo "   $line"
+    done
+    echo ""
+    echo "📋 Detailed report available in: $TELEMETRY_DIR/failure-report.json"
+    echo "=========================================="
+    echo ""
+
+    warning "Telemetry: Enhanced failure analysis completed - $FAILURE_CATEGORY_ENHANCED ($FAILURE_TYPE)"
 }
 
 # Classify failure as transient (retryable) or permanent (requires manual intervention)
@@ -443,6 +482,191 @@ classify_failure_type() {
     # Default classification - assume permanent for safety
     FAILURE_TYPE="permanent"
     FAILURE_DETAILS="Unknown failure type - manual investigation required"
+}
+
+# Enhanced error categorization with remediation suggestions
+categorize_failure_enhanced() {
+    local stage="$1"
+    local reason="$2"
+    local code="$3"
+
+    # Network-related errors with remediation
+    if echo "$reason" | grep -qi -E "(timeout|timed out|connection.*refused|connection.*reset|network.*unreachable)"; then
+        FAILURE_CATEGORY_ENHANCED="network_timeout"
+        REMEDIATION_SUGGESTIONS="1. Check internet connectivity
+2. Verify firewall settings
+3. Try again in a few minutes
+4. Consider using a different network
+5. Check GitHub status (githubstatus.com)"
+
+    elif echo "$reason" | grep -qi -E "(404|not found|file.*missing|resource.*missing)"; then
+        FAILURE_CATEGORY_ENHANCED="resource_missing"
+        REMEDIATION_SUGGESTIONS="1. Verify version exists in upstream repository
+2. Check release asset naming convention
+3. Update release patterns in config
+4. Verify GitHub repository URL
+5. Check if version was released properly"
+
+    elif echo "$reason" | grep -qi -E "(permission.*denied|access.*denied|unauthorized|401|403)"; then
+        FAILURE_CATEGORY_ENHANCED="permission_error"
+        REMEDIATION_SUGGESTIONS="1. Check file/directory permissions
+2. Verify Docker daemon access
+3. Run with appropriate user privileges
+4. Check GitHub token permissions
+5. Verify repository access rights"
+
+    elif echo "$reason" | grep -qi -E "(disk.*full|no.*space.*left|resource.*exhaustion)"; then
+        FAILURE_CATEGORY_ENHANCED="resource_exhaustion"
+        REMEDIATION_SUGGESTIONS="1. Free up disk space
+2. Clean Docker cache: docker system prune -af
+3. Remove temporary files
+4. Use a larger disk/volume
+5. Check available memory with 'free -h'"
+
+    elif echo "$reason" | grep -qi -E "(memory|out.*of.*memory|oom.*killer)"; then
+        FAILURE_CATEGORY_ENHANCED="memory_exhaustion"
+        REMEDIATION_SUGGESTIONS="1. Increase available RAM
+2. Reduce parallel build jobs
+3. Close other applications
+4. Add swap space if needed
+5. Use a machine with more memory"
+
+    elif echo "$reason" | grep -qi -E "(docker.*pull|registry|manifest|image)"; then
+        FAILURE_CATEGORY_ENHANCED="docker_registry"
+        REMEDIATION_SUGGESTIONS="1. Check Docker daemon status
+2. Verify internet connectivity
+3. Try manual docker pull
+4. Check Docker Hub status
+5. Restart Docker service"
+
+    elif echo "$reason" | grep -qi -E "(dependency|apt|dpkg|package.*install)"; then
+        FAILURE_CATEGORY_ENHANCED="dependency_error"
+        REMEDIATION_SUGGESTIONS="1. Update package lists: apt update
+2. Check package availability
+3. Verify repository configuration
+4. Install missing dependencies manually
+5. Check distribution compatibility"
+
+    elif echo "$reason" | grep -qi -E "(architecture|cross|qemu|multiarch|unsupported.*platform)"; then
+        FAILURE_CATEGORY_ENHANCED="architecture_error"
+        REMEDIATION_SUGGESTIONS="1. Verify architecture support in config
+2. Check qemu-user-static installation
+3. Update cross-compilation setup
+4. Verify target architecture exists
+5. Check distribution support for architecture"
+
+    elif echo "$reason" | grep -qi -E "(syntax|parse|invalid.*format|yaml|json)"; then
+        FAILURE_CATEGORY_ENHANCED="configuration_error"
+        REMEDIATION_SUGGESTIONS="1. Validate configuration file syntax
+2. Check YAML/JSON formatting
+3. Verify required fields are present
+4. Use linter for config validation
+5. Check example configuration files"
+
+    elif echo "$reason" | grep -qi -E "(compile|build|make|cmake|gcc|clang)"; then
+        FAILURE_CATEGORY_ENHANCED="compilation_error"
+        REMEDIATION_SUGGESTIONS="1. Check compiler version compatibility
+2. Verify build dependencies
+3. Check source code for syntax errors
+4. Review build logs for specific errors
+5. Try building with verbose output"
+
+    elif echo "$reason" | grep -qi -E "(rate.*limit|too.*many.*requests|429)"; then
+        FAILURE_CATEGORY_ENHANCED="rate_limiting"
+        REMEDIATION_SUGGESTIONS="1. Wait before retrying (exponential backoff)
+2. Use GitHub token with higher limits
+3. Reduce request frequency
+4. Cache responses when possible
+5. Consider GitHub API rate limits"
+
+    elif echo "$reason" | grep -qi -E "(dockerfile|invalid.*instruction)"; then
+        FAILURE_CATEGORY_ENHANCED="dockerfile_error"
+        REMEDIATION_SUGGESTIONS="1. Validate Dockerfile syntax
+2. Check base image availability
+3. Verify instruction parameters
+4. Test Docker build locally
+5. Review Docker best practices"
+
+    else
+        FAILURE_CATEGORY_ENHANCED="unknown_error"
+        REMEDIATION_SUGGESTIONS="1. Check complete build logs
+2. Reproduce error locally
+3. Search for similar issues online
+4. Check upstream documentation
+5. Report bug with full logs"
+    fi
+}
+
+# Generate detailed failure report
+generate_detailed_failure_report() {
+    local stage="$1"
+    local reason="$2"
+    local code="$3"
+    local arch="$4"
+    local dist="$5"
+
+    # Get current timestamp
+    local timestamp=$(date -Iseconds)
+
+    # Get system information
+    local hostname=$(hostname)
+    local os_info=$(uname -a)
+    local disk_space=$(df -h . | tail -1 | awk '{print $4}')
+    local memory_info=$(free -h | awk '/^Mem:/ {print $3 "/" $2}')
+
+    # Get Docker info if available
+    local docker_version="N/A"
+    local docker_images="N/A"
+    if command -v docker >/dev/null 2>&1; then
+        docker_version=$(docker --version 2>/dev/null || echo "Error")
+        docker_images=$(docker images 2>/dev/null | wc -l || echo "Error")
+    fi
+
+    # Generate report
+    DETAILED_FAILURE_REPORT="{
+  \"timestamp\": \"$timestamp\",
+  \"failure_summary\": {
+    \"stage\": \"$stage\",
+    \"reason\": \"$reason\",
+    \"exit_code\": $code,
+    \"failure_type\": \"$FAILURE_TYPE\",
+    \"failure_category\": \"$FAILURE_CATEGORY_ENHANCED\",
+    \"architecture\": \"$arch\",
+    \"distribution\": \"$dist\"
+  },
+  \"system_context\": {
+    \"hostname\": \"$hostname\",
+    \"os_info\": \"$os_info\",
+    \"disk_space_available\": \"$disk_space\",
+    \"memory_usage\": \"$memory_info\",
+    \"docker_version\": \"$docker_version\",
+    \"docker_images_count\": $docker_images
+  },
+  \"diagnostic_info\": {
+    \"failure_details\": \"$FAILURE_DETAILS\",
+    \"retry_count\": $RETRY_COUNT,
+    \"network_interface\": \"$NETWORK_INTERFACE\",
+    \"peak_memory_mb\": $PEAK_MEMORY_USAGE,
+    \"peak_cpu_percent\": $PEAK_CPU_USAGE
+  },
+  \"remediation\": {
+    \"category\": \"$FAILURE_CATEGORY_ENHANCED\",
+    \"suggestions\": \"$REMEDIATION_SUGGESTIONS\",
+    \"next_steps\": [
+      \"Review the complete build logs for specific error messages\",
+      \"Check if similar issues exist in project repository\",
+      \"Try reproducing the issue locally for debugging\",
+      \"Consider opening an issue with full diagnostic information\"
+    ]
+  },
+  \"troubleshooting_commands\": [
+    \"df -h              # Check disk space\",
+    \"free -h            # Check memory usage\",
+    \"docker ps          # Check running containers\",
+    \"docker images      # Check available images\",
+    \"ps aux             # Check running processes\"
+  ]
+}"
 }
 
 # Enhanced record failure with retry logic
@@ -857,6 +1081,8 @@ get_telemetry_summary() {
             failure_code: .build_metrics.failure_code,
             failure_type: .build_metrics.failure_type,
             failure_details_summary: .build_metrics.failure_details_summary,
+            failure_category_enhanced: .build_metrics.failure_category_enhanced,
+            remediation_suggestions: .build_metrics.remediation_suggestions,
             retry_count: .build_metrics.retry_count,
             last_retry_attempt: .build_metrics.last_retry_attempt,
             docker_info: .build_metrics.docker_info,
@@ -875,6 +1101,8 @@ export -f record_build_stage_complete
 export -f record_build_failure
 export -f record_build_failure_with_retry
 export -f classify_failure_type
+export -f categorize_failure_enhanced
+export -f generate_detailed_failure_report
 export -f finalize_telemetry
 export -f get_telemetry_summary
 export -f save_as_baseline
