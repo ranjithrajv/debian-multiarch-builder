@@ -10,15 +10,15 @@ TELEMETRY_LOG_FILE="$TELEMETRY_DIR/build-telemetry.log"
 TELEMETRY_DATA_FILE="$TELEMETRY_DIR/metrics.json"
 BASELINE_DATA_FILE="$TELEMETRY_DIR/baseline.json"
 
-# Telemetry state variables
-BUILD_START_TIME=""
-BUILD_END_TIME=""
+# Telemetry state variables (BUILD_START_TIME and BUILD_END_TIME are set in main script)
+export BUILD_START_TIME=""
+export BUILD_END_TIME=""
 export PEAK_MEMORY_USAGE=0
-CURRENT_MEMORY_USAGE=0
-NETWORK_BYTES_DOWNLOADED=0
-NETWORK_BYTES_UPLOADED=0
-BUILD_FAILURE_CATEGORY=""
-PERFORMANCE_REGRESSIONS=()
+export CURRENT_MEMORY_USAGE=0
+export NETWORK_BYTES_DOWNLOADED=0
+export NETWORK_BYTES_UPLOADED=0
+export BUILD_FAILURE_CATEGORY=""
+export PERFORMANCE_REGRESSIONS=()
 
 # Network tracking
 export NETWORK_INTERFACE=$(ip route get 8.8.8.8 2>/dev/null | awk '{print $5; exit}' || echo "eth0")
@@ -97,7 +97,11 @@ init_telemetry() {
 }
 EOF
 
-    BUILD_START_TIME=$(date +%s)
+    # Use BUILD_START_TIME from main script
+    if [ -z "$BUILD_START_TIME" ] || [ "$BUILD_START_TIME" = "0" ]; then
+        BUILD_START_TIME=$(date +%s)
+    fi
+
     start_memory_monitoring
     start_network_monitoring
 
@@ -401,24 +405,64 @@ update_final_telemetry_data() {
         return 0
     fi
 
+    # Debug: Log key values
+    echo "DEBUG: BUILD_START_TIME=$BUILD_START_TIME, BUILD_END_TIME=$BUILD_END_TIME, duration=$build_duration" >> "$TELEMETRY_DIR/debug.log"
+
     # Read peak memory from file to get latest value
     if [ -f "$TELEMETRY_DIR/current-peak-memory.txt" ]; then
         PEAK_MEMORY_USAGE=$(cat "$TELEMETRY_DIR/current-peak-memory.txt")
+        echo "DEBUG: PEAK_MEMORY_USAGE=$PEAK_MEMORY_USAGE" >> "$TELEMETRY_DIR/debug.log"
+    else
+        echo "DEBUG: No peak memory file found" >> "$TELEMETRY_DIR/debug.log"
     fi
+
+    echo "DEBUG: NETWORK_BYTES_DOWNLOADED=$NETWORK_BYTES_DOWNLOADED, NETWORK_BYTES_UPLOADED=$NETWORK_BYTES_UPLOADED" >> "$TELEMETRY_DIR/debug.log"
 
     if command -v yq >/dev/null 2>&1; then
         # Use proper quoting for date values to avoid yq parsing issues
         local start_time_iso=$(date -d "@$BUILD_START_TIME" -Iseconds)
         local end_time_iso=$(date -d "@$BUILD_END_TIME" -Iseconds)
 
-        # Update telemetry with error handling
-        yq eval ".build_session.start_time = \"$start_time_iso\"" -i "$TELEMETRY_DATA_FILE" 2>/dev/null || echo "Warning: Failed to update start_time"
-        yq eval ".build_session.end_time = \"$end_time_iso\"" -i "$TELEMETRY_DATA_FILE" 2>/dev/null || echo "Warning: Failed to update end_time"
-        yq eval ".build_session.duration_seconds = $build_duration" -i "$TELEMETRY_DATA_FILE" 2>/dev/null || echo "Warning: Failed to update duration"
-        yq eval ".memory_metrics.peak_usage_mb = $PEAK_MEMORY_USAGE" -i "$TELEMETRY_DATA_FILE" 2>/dev/null || echo "Warning: Failed to update memory"
-        yq eval ".network_metrics.bytes_downloaded = $NETWORK_BYTES_DOWNLOADED" -i "$TELEMETRY_DATA_FILE" 2>/dev/null || echo "Warning: Failed to update download bytes"
-        yq eval ".network_metrics.bytes_uploaded = $NETWORK_BYTES_UPLOADED" -i "$TELEMETRY_DATA_FILE" 2>/dev/null || echo "Warning: Failed to update upload bytes"
+        echo "DEBUG: yq available, updating telemetry file: $TELEMETRY_DATA_FILE" >> "$TELEMETRY_DIR/debug.log"
+
+        # Update telemetry with better error handling and logging
+        if yq eval ".build_session.start_time = \"$start_time_iso\"" -i "$TELEMETRY_DATA_FILE" 2>> "$TELEMETRY_DIR/debug.log"; then
+            echo "DEBUG: Updated start_time successfully" >> "$TELEMETRY_DIR/debug.log"
+        else
+            echo "ERROR: Failed to update start_time" >> "$TELEMETRY_DIR/debug.log"
+        fi
+
+        if yq eval ".build_session.end_time = \"$end_time_iso\"" -i "$TELEMETRY_DATA_FILE" 2>> "$TELEMETRY_DIR/debug.log"; then
+            echo "DEBUG: Updated end_time successfully" >> "$TELEMETRY_DIR/debug.log"
+        else
+            echo "ERROR: Failed to update end_time" >> "$TELEMETRY_DIR/debug.log"
+        fi
+
+        if yq eval ".build_session.duration_seconds = $build_duration" -i "$TELEMETRY_DATA_FILE" 2>> "$TELEMETRY_DIR/debug.log"; then
+            echo "DEBUG: Updated duration successfully: $build_duration" >> "$TELEMETRY_DIR/debug.log"
+        else
+            echo "ERROR: Failed to update duration: $build_duration" >> "$TELEMETRY_DIR/debug.log"
+        fi
+
+        if yq eval ".memory_metrics.peak_usage_mb = $PEAK_MEMORY_USAGE" -i "$TELEMETRY_DATA_FILE" 2>> "$TELEMETRY_DIR/debug.log"; then
+            echo "DEBUG: Updated memory successfully: $PEAK_MEMORY_USAGE" >> "$TELEMETRY_DIR/debug.log"
+        else
+            echo "ERROR: Failed to update memory: $PEAK_MEMORY_USAGE" >> "$TELEMETRY_DIR/debug.log"
+        fi
+
+        if yq eval ".network_metrics.bytes_downloaded = $NETWORK_BYTES_DOWNLOADED" -i "$TELEMETRY_DATA_FILE" 2>> "$TELEMETRY_DIR/debug.log"; then
+            echo "DEBUG: Updated download bytes successfully: $NETWORK_BYTES_DOWNLOADED" >> "$TELEMETRY_DIR/debug.log"
+        else
+            echo "ERROR: Failed to update download bytes: $NETWORK_BYTES_DOWNLOADED" >> "$TELEMETRY_DIR/debug.log"
+        fi
+
+        if yq eval ".network_metrics.bytes_uploaded = $NETWORK_BYTES_UPLOADED" -i "$TELEMETRY_DATA_FILE" 2>> "$TELEMETRY_DIR/debug.log"; then
+            echo "DEBUG: Updated upload bytes successfully: $NETWORK_BYTES_UPLOADED" >> "$TELEMETRY_DIR/debug.log"
+        else
+            echo "ERROR: Failed to update upload bytes: $NETWORK_BYTES_UPLOADED" >> "$TELEMETRY_DIR/debug.log"
+        fi
     else
+        echo "ERROR: yq not available for telemetry updates" >> "$TELEMETRY_DIR/debug.log"
         echo "Warning: yq not available for telemetry updates"
     fi
 }
