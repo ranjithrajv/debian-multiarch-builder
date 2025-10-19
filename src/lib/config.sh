@@ -2,16 +2,11 @@
 
 # Configuration parsing and validation functions
 
-# Built-in Debian distribution architecture support rules
-# These are universal Debian policies and applied automatically
-declare -A DEBIAN_ARCH_SUPPORT=(
-    # i386 deprecated in Trixie (v13), only in Bookworm (v12)
-    ["i386"]="bookworm"
-    # armel last version in Bookworm (v12) as regular architecture
-    ["armel"]="bookworm"
-    # riscv64 introduced in Trixie (v13)
-    ["riscv64"]="trixie forky sid"
-)
+# Source YAML utilities for loading externalized configuration
+source "$SCRIPT_DIR/data/yaml-utils.sh"
+
+# Load architecture support data
+load_architecture_support
 
 # Parse and validate configuration
 parse_config() {
@@ -19,7 +14,7 @@ parse_config() {
     local config_dir=$(dirname "$config_file")
 
     # Initialize CI environment detection first
-    source "$SCRIPT_DIR/../ci-optimization.sh"
+    source "$SCRIPT_DIR/ci-optimization.sh"
     init_ci_optimization
 
     # New split configuration: package.yaml + optional overrides.yaml
@@ -213,13 +208,6 @@ is_arch_supported_for_dist() {
         return $?
     fi
 
-    # Check built-in Debian distribution rules
-    if [ -n "${DEBIAN_ARCH_SUPPORT[$arch]}" ]; then
-        # Built-in rule exists, check if dist is in the supported list
-        echo "${DEBIAN_ARCH_SUPPORT[$arch]}" | grep -qw "$dist"
-        return $?
-    fi
-
-    # No override or built-in rule, all distributions supported
-    return 0
+    # Use YAML-based function for built-in Debian distribution rules
+    is_arch_supported_for_dist_from_yaml "$arch" "$dist"
 }
