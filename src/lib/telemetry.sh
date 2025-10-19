@@ -20,6 +20,9 @@ export CURRENT_CPU_USAGE=0
 export NETWORK_BYTES_DOWNLOADED=0
 export NETWORK_BYTES_UPLOADED=0
 export BUILD_FAILURE_CATEGORY=""
+export FAILURE_TYPE=""  # transient or permanent
+export FAILURE_DETAILS=""
+export RETRY_COUNT=0
 export PERFORMANCE_REGRESSIONS=()
 
 # Network tracking
@@ -84,6 +87,10 @@ init_telemetry() {
     "failure_reason": "",
     "failure_details": [],
     "failure_code": 0,
+    "failure_type": "",
+    "failure_details_summary": "",
+    "retry_count": 0,
+    "last_retry_attempt": "",
     "packages_built": 0,
     "packages_failed": 0,
     "build_stages": [],
@@ -347,7 +354,129 @@ record_build_failure() {
     update_telemetry_field "build_metrics.failure_reason" "$failure_reason"
     update_telemetry_field "build_metrics.failure_code" "$error_code"
 
-    warning "Telemetry: Build failure categorized as $BUILD_FAILURE_CATEGORY"
+    # Classify failure as transient or permanent
+    classify_failure_type "$failure_stage" "$failure_reason" "$error_code"
+
+    # Update telemetry with failure classification
+    update_telemetry_field "build_metrics.failure_type" "$FAILURE_TYPE"
+    update_telemetry_field "build_metrics.failure_details" "$FAILURE_DETAILS"
+    update_telemetry_field "build_metrics.retry_count" "$RETRY_COUNT"
+
+    warning "Telemetry: Build failure categorized as $BUILD_FAILURE_CATEGORY ($FAILURE_TYPE)"
+}
+
+# Classify failure as transient (retryable) or permanent (requires manual intervention)
+classify_failure_type() {
+    local stage="$1"
+    local reason="$2"
+    local code="$3"
+
+    # Default retry count (could be incremented in retry logic)
+    RETRY_COUNT=${RETRY_COUNT:-0}
+
+    # Transient failures - these can be retried and may succeed
+    if echo "$reason" | grep -qi -E "(timeout|timed out|connection.*refused|connection.*reset|network.*unreachable)"; then
+        FAILURE_TYPE="transient"
+        FAILURE_DETAILS="Network timeout - retryable"
+        return 0
+    elif echo "$reason" | grep -qi -E "(temporary.*failure|temporarily.*unavailable|service.*unavailable)"; then
+        FAILURE_TYPE="transient"
+        FAILURE_DETAILS="Service temporarily unavailable - retryable"
+        return 0
+    elif echo "$reason" | grep -qi -E "(rate.*limit|too.*many.*requests|429)"; then
+        FAILURE_TYPE="transient"
+        FAILURE_DETAILS="Rate limiting - retry after delay"
+        return 0
+    elif echo "$reason" | grep -qi -E "(docker.*pull.*failed|registry.*unavailable|manifest.*unknown)"; then
+        FAILURE_TYPE="transient"
+        FAILURE_DETAILS="Docker registry issue - retryable"
+        return 0
+    elif echo "$reason" | grep -qi -E "(download.*interrupted|wget.*failed|curl.*failed).*timeout"; then
+        FAILURE_TYPE="transient"
+        FAILURE_DETAILS="Download timeout - retryable"
+        return 0
+    elif echo "$reason" | grep -qi -E "(resource.*busy|device.*busy|locked)"; then
+        FAILURE_TYPE="transient"
+        FAILURE_DETAILS="Resource temporarily busy - retryable"
+        return 0
+    fi
+
+    # Permanent failures - these require manual intervention
+    if echo "$reason" | grep -qi -E "(no such file|file.*not found|directory.*not found|404|not found)"; then
+        FAILURE_TYPE="permanent"
+        FAILURE_DETAILS="Missing files or resources - manual intervention required"
+        return 0
+    elif echo "$reason" | grep -qi -E "(permission.*denied|access.*denied|unauthorized|401|403)"; then
+        FAILURE_TYPE="permanent"
+        FAILURE_DETAILS="Permission or authentication error - manual intervention required"
+        return 0
+    elif echo "$reason" | grep -qi -E "(invalid.*credential|authentication.*failed|login.*failed)"; then
+        FAILURE_TYPE="permanent"
+        FAILURE_DETAILS="Invalid credentials - manual intervention required"
+        return 0
+    elif echo "$reason" | grep -qi -E "(syntax.*error|parse.*error|invalid.*format|invalid.*yaml|invalid.*json)"; then
+        FAILURE_TYPE="permanent"
+        FAILURE_DETAILS="Syntax or format error - manual intervention required"
+        return 0
+    elif echo "$reason" | grep -qi -E "(command.*not found|executable.*not found|binary.*not found)"; then
+        FAILURE_TYPE="permanent"
+        FAILURE_DETAILS="Missing dependencies or tools - manual intervention required"
+        return 0
+    elif echo "$reason" | grep -qi -E "(dockerfile.*error|invalid.*instruction)"; then
+        FAILURE_TYPE="permanent"
+        FAILURE_DETAILS="Dockerfile configuration error - manual intervention required"
+        return 0
+    elif echo "$reason" | grep -qi -E "(architecture.*not.*supported|unsupported.*platform)"; then
+        FAILURE_TYPE="permanent"
+        FAILURE_DETAILS="Unsupported architecture or platform - manual intervention required"
+        return 0
+    elif echo "$reason" | grep -qi -E "(disk.*full|no.*space.*left|out.*of.*memory|oom.*killer)"; then
+        FAILURE_TYPE="permanent"
+        FAILURE_DETAILS="Resource exhaustion - manual intervention required"
+        return 0
+    elif echo "$reason" | grep -qi -E "(invalid.*config|configuration.*error|missing.*config)"; then
+        FAILURE_TYPE="permanent"
+        FAILURE_DETAILS="Configuration error - manual intervention required"
+        return 0
+    fi
+
+    # Default classification - assume permanent for safety
+    FAILURE_TYPE="permanent"
+    FAILURE_DETAILS="Unknown failure type - manual investigation required"
+}
+
+# Enhanced record failure with retry logic
+record_build_failure_with_retry() {
+    local failure_stage="$1"
+    local failure_reason="$2"
+    local error_code="$3"
+    local max_retries="${4:-3}"
+
+    # Classify the failure first
+    classify_failure_type "$failure_stage" "$failure_reason" "$error_code"
+
+    if [ "$FAILURE_TYPE" = "transient" ] && [ "$RETRY_COUNT" -lt "$max_retries" ]; then
+        RETRY_COUNT=$((RETRY_COUNT + 1))
+        info "Transient failure detected (attempt $RETRY_COUNT/$max_retries): $FAILURE_DETAILS"
+        info "Retrying $failure_stage..."
+
+        # Update telemetry with retry attempt
+        update_telemetry_field "build_metrics.retry_count" "$RETRY_COUNT"
+        update_telemetry_field "build_metrics.last_retry_attempt" "$(date -Iseconds)"
+
+        return 2  # Signal that retry should be attempted
+    else
+        # Record the permanent failure or max retries reached
+        record_build_failure "$failure_stage" "$failure_reason" "$error_code"
+
+        if [ "$FAILURE_TYPE" = "transient" ]; then
+            warning "Maximum retries ($max_retries) exceeded for transient failure"
+        else
+            error "Permanent failure detected: $FAILURE_DETAILS"
+        fi
+
+        return 1  # Signal failure
+    fi
 }
 
 # Categorize build failures
@@ -726,6 +855,10 @@ get_telemetry_summary() {
             failure_reason: .build_metrics.failure_reason,
             failure_details: .build_metrics.failure_details,
             failure_code: .build_metrics.failure_code,
+            failure_type: .build_metrics.failure_type,
+            failure_details_summary: .build_metrics.failure_details_summary,
+            retry_count: .build_metrics.retry_count,
+            last_retry_attempt: .build_metrics.last_retry_attempt,
             docker_info: .build_metrics.docker_info,
             system_resources: .build_metrics.system_resources,
             performance_regressions: .performance_metrics.regressions_detected
@@ -740,6 +873,8 @@ export -f init_telemetry
 export -f record_build_stage
 export -f record_build_stage_complete
 export -f record_build_failure
+export -f record_build_failure_with_retry
+export -f classify_failure_type
 export -f finalize_telemetry
 export -f get_telemetry_summary
 export -f save_as_baseline
