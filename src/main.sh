@@ -199,6 +199,13 @@ if [ "$ARCH" = "all" ]; then
             echo ""
             echo "✅ Total: $TOTAL_PACKAGES packages successfully built"
 
+            # Record successful completion in telemetry
+            if [ "$TOTAL_PACKAGES" -eq "$attempted_packages" ]; then
+                record_build_stage_complete "build_completion" "success" "All attempted builds completed successfully"
+            else
+                record_build_stage_complete "build_completion" "partial_success" "Build completed with $TOTAL_PACKAGES/$attempted_packages packages ($SUCCESS_RATE% success rate)"
+            fi
+
             # Show resource usage summary
             if [ "$TELEMETRY_ENABLED" = "true" ] && [ -f ".telemetry/current-peak-memory.txt" ]; then
                 peak_mem=$(cat .telemetry/current-peak-memory.txt 2>/dev/null || echo "0")
@@ -208,15 +215,8 @@ if [ "$ARCH" = "all" ]; then
                 fi
             fi
 
-            # Generate build summary JSON
+            # Generate build summary JSON (after telemetry is finalized)
             generate_build_summary
-
-            # Record successful completion in telemetry
-            if [ "$TOTAL_PACKAGES" -eq "$attempted_packages" ]; then
-                record_build_stage_complete "build_completion" "success" "All attempted builds completed successfully"
-            else
-                record_build_stage_complete "build_completion" "partial_success" "Build completed with $TOTAL_PACKAGES/$attempted_packages packages ($SUCCESS_RATE% success rate)"
-            fi
         else
             # Build functions returned success but no packages were created
             echo ""
