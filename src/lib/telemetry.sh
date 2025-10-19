@@ -26,6 +26,14 @@ export FAILURE_CATEGORY_ENHANCED=""  # Enhanced category with remediation
 export REMEDIATION_SUGGESTIONS=""
 export DETAILED_FAILURE_REPORT=""
 export RETRY_COUNT=0
+
+# Comprehensive error context variables
+export ERROR_CONTEXT=""  # Rich environmental context
+export API_RESPONSE_CODES=""  # API response details
+export SYSTEM_SNAPSHOT=""  # System state at failure time
+export NETWORK_CONDITIONS=""  # Network status at failure
+export ENVIRONMENT_DETAILS=""  # Build environment context
+export DIAGNOSTIC_DATA=""  # Auto-collected diagnostic info
 export PERFORMANCE_REGRESSIONS=()
 
 # Network tracking
@@ -96,6 +104,12 @@ init_telemetry() {
     "remediation_suggestions": "",
     "retry_count": 0,
     "last_retry_attempt": "",
+    "error_context": {},
+    "api_response_codes": {},
+    "system_snapshot": {},
+    "network_conditions": {},
+    "environment_details": {},
+    "diagnostic_data": {},
     "packages_built": 0,
     "packages_failed": 0,
     "build_stages": [],
@@ -365,6 +379,9 @@ record_build_failure() {
     # Generate detailed failure report
     generate_detailed_failure_report "$failure_stage" "$failure_reason" "$error_code" "$arch" "$dist"
 
+    # Collect comprehensive error context
+    collect_error_context "$failure_stage" "$failure_reason" "$error_code" "$arch" "$dist"
+
     # Update telemetry with all failure information
     update_telemetry_field "build_metrics.failure_category" "$BUILD_FAILURE_CATEGORY"
     update_telemetry_field "build_metrics.failure_stage" "$failure_stage"
@@ -376,28 +393,73 @@ record_build_failure() {
     update_telemetry_field "build_metrics.failure_category_enhanced" "$FAILURE_CATEGORY_ENHANCED"
     update_telemetry_field "build_metrics.remediation_suggestions" "$REMEDIATION_SUGGESTIONS"
 
+    # Update telemetry with comprehensive error context
+    update_telemetry_field "build_metrics.error_context" "$ERROR_CONTEXT"
+    update_telemetry_field "build_metrics.api_response_codes" "$API_RESPONSE_CODES"
+    update_telemetry_field "build_metrics.system_snapshot" "$SYSTEM_SNAPSHOT"
+    update_telemetry_field "build_metrics.network_conditions" "$NETWORK_CONDITIONS"
+    update_telemetry_field "build_metrics.environment_details" "$ENVIRONMENT_DETAILS"
+    update_telemetry_field "build_metrics.diagnostic_data" "$DIAGNOSTIC_DATA"
+
     # Save detailed failure report to file
     if [ -n "$DETAILED_FAILURE_REPORT" ]; then
         echo "$DETAILED_FAILURE_REPORT" > "$TELEMETRY_DIR/failure-report.json"
         info "Detailed failure report saved to $TELEMETRY_DIR/failure-report.json"
     fi
 
-    # Display enhanced failure information
+    # Display enhanced failure information with comprehensive context
     echo ""
     echo "=========================================="
-    echo "❌ ENHANCED FAILURE ANALYSIS"
+    echo "❌ COMPREHENSIVE FAILURE ANALYSIS"
     echo "=========================================="
     echo "📊 Failure Category: $FAILURE_CATEGORY_ENHANCED"
     echo "🏷️  Failure Type: $FAILURE_TYPE"
     echo "📍 Stage: $failure_stage"
     echo "🔧 Architecture: $arch, Distribution: $dist"
     echo ""
+
+    # Show system context summary
+    if [ -n "$SYSTEM_SNAPSHOT" ]; then
+        echo "🖥️  SYSTEM CONTEXT:"
+        local mem_usage=$(echo "$SYSTEM_SNAPSHOT" | jq -r '.memory.used_mb // "0"' 2>/dev/null || echo "0")
+        local mem_total=$(echo "$SYSTEM_SNAPSHOT" | jq -r '.memory.total_mb // "0"' 2>/dev/null || echo "0")
+        local disk_usage=$(echo "$SYSTEM_SNAPSHOT" | jq -r '.disk.usage_percent // "0"' 2>/dev/null || echo "0")
+        local cpu_cores=$(echo "$SYSTEM_SNAPSHOT" | jq -r '.cpu.cores // "0"' 2>/dev/null || echo "0")
+        echo "   Memory: ${mem_usage}/${mem_total} MB used"
+        echo "   Disk: ${disk_usage}% used"
+        echo "   CPU: ${cpu_cores} cores"
+        echo ""
+    fi
+
+    # Show network conditions summary
+    if [ -n "$NETWORK_CONDITIONS" ]; then
+        echo "🌐 NETWORK CONDITIONS:"
+        local interface=$(echo "$NETWORK_CONDITIONS" | jq -r '.interface // "unknown"' 2>/dev/null || echo "unknown")
+        local status=$(echo "$NETWORK_CONDITIONS" | jq -r '.interface_status // "unknown"' 2>/dev/null || echo "unknown")
+        echo "   Interface: $interface ($status)"
+        echo ""
+    fi
+
+    # Show API status
+    if [ -n "$API_RESPONSE_CODES" ]; then
+        echo "📡 API STATUS:"
+        local github_status=$(echo "$API_RESPONSE_CODES" | jq -r '.github_api_status // "unknown"' 2>/dev/null || echo "unknown")
+        local rate_limit=$(echo "$API_RESPONSE_CODES" | jq -r '.github_rate_limit // "unknown"' 2>/dev/null || echo "unknown")
+        echo "   GitHub API: $github_status (Rate limit: $rate_limit remaining)"
+        echo ""
+    fi
+
     echo "💡 REMEDIATION SUGGESTIONS:"
     echo "$REMEDIATION_SUGGESTIONS" | while IFS= read -r line; do
         echo "   $line"
     done
     echo ""
-    echo "📋 Detailed report available in: $TELEMETRY_DIR/failure-report.json"
+    echo "📋 Comprehensive reports available:"
+    echo "   📄 Failure analysis: $TELEMETRY_DIR/failure-report.json"
+    echo "   🔍 Telemetry data: $TELEMETRY_DIR/metrics.json"
+    echo "   📊 System snapshot: Captured in failure report"
+    echo "   🌐 Network conditions: Captured in failure report"
+    echo "   📡 API response details: Captured in failure report"
     echo "=========================================="
     echo ""
 
@@ -622,7 +684,7 @@ generate_detailed_failure_report() {
         docker_images=$(docker images 2>/dev/null | wc -l || echo "Error")
     fi
 
-    # Generate report
+    # Generate comprehensive report with full context
     DETAILED_FAILURE_REPORT="{
   \"timestamp\": \"$timestamp\",
   \"failure_summary\": {
@@ -634,6 +696,12 @@ generate_detailed_failure_report() {
     \"architecture\": \"$arch\",
     \"distribution\": \"$dist\"
   },
+  \"error_context\": $ERROR_CONTEXT,
+  \"api_response_codes\": $API_RESPONSE_CODES,
+  \"system_snapshot\": $SYSTEM_SNAPSHOT,
+  \"network_conditions\": $NETWORK_CONDITIONS,
+  \"environment_details\": $ENVIRONMENT_DETAILS,
+  \"diagnostic_data\": $DIAGNOSTIC_DATA,
   \"system_context\": {
     \"hostname\": \"$hostname\",
     \"os_info\": \"$os_info\",
@@ -656,7 +724,8 @@ generate_detailed_failure_report() {
       \"Review the complete build logs for specific error messages\",
       \"Check if similar issues exist in project repository\",
       \"Try reproducing the issue locally for debugging\",
-      \"Consider opening an issue with full diagnostic information\"
+      \"Consider opening an issue with full diagnostic information\",
+      \"Analyze the comprehensive error context provided in this report\"
     ]
   },
   \"troubleshooting_commands\": [
@@ -664,8 +733,194 @@ generate_detailed_failure_report() {
     \"free -h            # Check memory usage\",
     \"docker ps          # Check running containers\",
     \"docker images      # Check available images\",
-    \"ps aux             # Check running processes\"
+    \"ps aux             # Check running processes\",
+    \"journalctl -f      # Monitor system logs\",
+    \"dmesg              # Check kernel messages\",
+    \"netstat -i         # Check network interface statistics\",
+    \"ulimit -a          # Check resource limits\"
   ]
+}"
+}
+
+# Collect comprehensive error context
+collect_error_context() {
+    local failure_stage="$1"
+    local failure_reason="$2"
+    local error_code="$3"
+    local arch="$4"
+    local dist="$5"
+
+    local timestamp=$(date -Iseconds)
+
+    # Collect rich environmental information
+    ERROR_CONTEXT="{
+  \"failure_timestamp\": \"$timestamp\",
+  \"build_environment\": {
+    \"working_directory\": \"$(pwd)\",
+    \"user\": \"$(whoami 2>/dev/null || echo 'unknown')\",
+    \"home_directory\": \"$HOME\",
+    \"shell\": \"$SHELL\",
+    \"path\": \"$PATH\",
+    \"timezone\": \"$(timedatectl show --property=Timezone --value 2>/dev/null || echo 'unknown')\",
+    \"locale\": \"$(locale 2>/dev/null | grep LC_CTYPE | cut -d= -f2 || echo 'unknown')\"
+  },
+  \"system_load\": {
+    \"load_1min\": \"$(cat /proc/loadavg | awk '{print $1}' 2>/dev/null || echo '0')\",
+    \"load_5min\": \"$(cat /proc/loadavg | awk '{print $2}' 2>/dev/null || echo '0')\",
+    \"load_15min\": \"$(cat /proc/loadavg | awk '{print $3}' 2>/dev/null || echo '0')\",
+    \"running_processes\": \"$(cat /proc/loadavg | awk '{print $4}' 2>/dev/null || echo '0')\"
+  },
+  \"resource_limits\": {
+    \"max_open_files\": \"$(ulimit -n 2>/dev/null || echo 'unknown')\",
+    \"max_user_processes\": \"$(ulimit -u 2>/dev/null || echo 'unknown')\",
+    \"max_memory\": \"$(ulimit -v 2>/dev/null || echo 'unknown')\",
+    \"stack_size\": \"$(ulimit -s 2>/dev/null || echo 'unknown')\"
+  },
+  \"process_info\": {
+    \"build_pid\": \"$$\",
+    \"parent_pid\": \"$(ps -o ppid= -p $$ 2>/dev/null | awk '{print $1}' || echo 'unknown')\",
+    \"process_tree\": \"$(pstree -p $$ 2>/dev/null || echo 'unknown')\",
+    \"environment_size\": \"$(env 2>/dev/null | wc -l || echo '0')\"
+  }
+}"
+
+    # Collect API response codes and network details
+    API_RESPONSE_CODES="{
+  \"github_api_status\": \"$(curl -s -o /dev/null -w '%{http_code}' https://api.github.com/rate_limit 2>/dev/null || echo 'failed')\",
+  \"github_rate_limit\": \"$(curl -s https://api.github.com/rate_limit 2>/dev/null | jq -r '.rate.remaining // 'unknown'' 2>/dev/null || echo 'unknown')\",
+  \"github_rate_limit_reset\": \"$(curl -s https://api.github.com/rate_limit 2>/dev/null | jq -r '.rate.reset // 'unknown'' 2>/dev/null || echo 'unknown')\",
+  \"dns_resolution\": \"$(nslookup github.com 2>/dev/null | grep -c 'Address:' || echo '0')\",
+  \"connectivity_tests\": {
+    \"github\": \"$(timeout 5 ping -c 1 github.com >/dev/null 2>&1 && echo 'success' || echo 'failed')\",
+    \"google_dns\": \"$(timeout 5 ping -c 1 8.8.8.8 >/dev/null 2>&1 && echo 'success' || echo 'failed')\",
+    \"internet\": \"$(timeout 5 ping -c 1 1.1.1.1 >/dev/null 2>&1 && echo 'success' || echo 'failed')\"
+  }
+}"
+
+    # Collect system snapshot at failure time
+    SYSTEM_SNAPSHOT="{
+  \"memory\": {
+    \"total_mb\": \"$(free -m | awk '/^Mem:/{print $2}' 2>/dev/null || echo '0')\",
+    \"used_mb\": \"$(free -m | awk '/^Mem:/{print $3}' 2>/dev/null || echo '0')\",
+    \"free_mb\": \"$(free -m | awk '/^Mem:/{print $4}' 2>/dev/null || echo '0')\",
+    \"available_mb\": \"$(free -m | awk '/^Mem:/{print $7}' 2>/dev/null || echo '0')\",
+    \"swap_total_mb\": \"$(free -m | awk '/^Swap:/{print $2}' 2>/dev/null || echo '0')\",
+    \"swap_used_mb\": \"$(free -m | awk '/^Swap:/{print $3}' 2>/dev/null || echo '0')\"
+  },
+  \"disk\": {
+    \"filesystem\": \"$(df -h . 2>/dev/null | tail -1 | awk '{print $1}' || echo 'unknown')\",
+    \"total_gb\": \"$(df -BG . 2>/dev/null | tail -1 | awk '{print $2}' | sed 's/G//' || echo '0')\",
+    \"used_gb\": \"$(df -BG . 2>/dev/null | tail -1 | awk '{print $3}' | sed 's/G//' || echo '0')\",
+    \"available_gb\": \"$(df -BG . 2>/dev/null | tail -1 | awk '{print $4}' | sed 's/G//' || echo '0')\",
+    \"usage_percent\": \"$(df -h . 2>/dev/null | tail -1 | awk '{print $5}' | sed 's/%//' || echo '0')\",
+    \"inode_usage\": \"$(df -i . 2>/dev/null | tail -1 | awk '{print $5}' | sed 's/%//' || echo '0')\"
+  },
+  \"cpu\": {
+    \"model\": \"$(grep 'model name' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2 | xargs || echo 'unknown')\",
+    \"cores\": \"$(nproc 2>/dev/null || echo '0')\",
+    \"threads\": \"$(grep -c processor /proc/cpuinfo 2>/dev/null || echo '0')\",
+    \"frequency_mhz\": \"$(grep 'cpu MHz' /proc/cpuinfo 2>/dev/null | head -1 | awk '{print $4}' || echo '0')\",
+    \"cache_info\": \"$(grep 'cache size' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2 | xargs || echo 'unknown')\"
+  },
+  \"processes\": {
+    \"total\": \"$(ps aux 2>/dev/null | wc -l || echo '0')\",
+    \"running\": \"$(ps aux 2>/dev/null | awk '$8 ~ /^R/ {print}' | wc -l || echo '0')\",
+    \"sleeping\": \"$(ps aux 2>/dev/null | awk '$8 ~ /^S/ {print}' | wc -l || echo '0')\",
+    \"zombie\": \"$(ps aux 2>/dev/null | awk '$8 ~ /^Z/ {print}' | wc -l || echo '0')\",
+    \"top_memory\": \"$(ps aux --sort=-%mem 2>/dev/null | head -5 | awk '{print $11, $4}' || echo 'unknown')\",
+    \"top_cpu\": \"$(ps aux --sort=-%cpu 2>/dev/null | head -5 | awk '{print $11, $3}' || echo 'unknown')\"
+  }
+}"
+
+    # Collect network conditions
+    NETWORK_CONDITIONS="{
+  \"interface\": \"$NETWORK_INTERFACE\",
+  \"interface_status\": \"$(ip link show $NETWORK_INTERFACE 2>/dev/null | grep -o 'state [A-Z]*' | cut -d' ' -f2 || echo 'unknown')\",
+  \"ip_addresses\": {
+    \"ipv4\": \"$(ip addr show $NETWORK_INTERFACE 2>/dev/null | grep 'inet ' | awk '{print $2}' | head -1 || echo 'none')\",
+    \"ipv6\": \"$(ip addr show $NETWORK_INTERFACE 2>/dev/null | grep 'inet6 ' | awk '{print $2}' | head -1 || echo 'none')\"
+  },
+  \"network_stats\": {
+    \"rx_bytes\": \"$(cat /proc/net/dev 2>/dev/null | grep $NETWORK_INTERFACE | awk '{print $2}' || echo '0')\",
+    \"tx_bytes\": \"$(cat /proc/net/dev 2>/dev/null | grep $NETWORK_INTERFACE | awk '{print $10}' || echo '0')\",
+    \"rx_packets\": \"$(cat /proc/net/dev 2>/dev/null | grep $NETWORK_INTERFACE | awk '{print $3}' || echo '0')\",
+    \"tx_packets\": \"$(cat /proc/net/dev 2>/dev/null | grep $NETWORK_INTERFACE | awk '{print $11}' || echo '0')\",
+    \"rx_errors\": \"$(cat /proc/net/dev 2>/dev/null | grep $NETWORK_INTERFACE | awk '{print $4}' || echo '0')\",
+    \"tx_errors\": \"$(cat /proc/net/dev 2>/dev/null | grep $NETWORK_INTERFACE | awk '{print $12}' || echo '0')\"
+  },
+  \"dns_servers\": \"$(cat /etc/resolv.conf 2>/dev/null | grep nameserver | awk '{print $2}' | tr '\n' ' ' || echo 'unknown')\",
+  \"routing\": {
+    \"default_gateway\": \"$(ip route | grep default | awk '{print $3}' | head -1 || echo 'none')\",
+    \"gateway_interface\": \"$(ip route | grep default | awk '{print $5}' | head -1 || echo 'none')\"
+  }
+}"
+
+    # Collect build environment details
+    ENVIRONMENT_DETAILS="{
+  \"build_context\": {
+    \"stage\": \"$failure_stage\",
+    \"architecture\": \"$arch\",
+    \"distribution\": \"$dist\",
+    \"package_name\": \"${PACKAGE_NAME:-unknown}\",
+    \"version\": \"${VERSION:-unknown}\",
+    \"build_version\": \"${BUILD_VERSION:-unknown}\",
+    \"github_repo\": \"${GITHUB_REPO:-unknown}\"
+  },
+  \"container_info\": {
+    \"in_container\": \"$(grep -q 'docker\|lxc' /proc/1/cgroup 2>/dev/null && echo 'true' || echo 'false')\",
+    \"container_id\": \"$(cat /proc/self/cgroup 2>/dev/null | grep 'docker' | tail -1 | cut -d/ -f3 | head -c 12 || echo 'none')\",
+    \"mount_info\": \"$(mount | grep -E '(docker|overlayfs|aufs)' | wc -l 2>/dev/null || echo '0')\"
+  },
+  \"security_context\": {
+    \"selinux_status\": \"$(getenforce 2>/dev/null || echo 'disabled')\",
+    \"apparmor_status\": \"$(aa-status 2>/dev/null | grep -c profiles || echo '0')\",
+    \"capabilities\": \"$(capsh --print 2>/dev/null | grep -c 'bounding=' || echo 'unknown')\"
+  },
+  \"temp_directories\": {
+    \"/tmp_space_mb\": \"$(df -m /tmp 2>/dev/null | tail -1 | awk '{print $4}' || echo '0')\",
+    \"/tmp_files\": \"$(find /tmp -maxdepth 1 -type f 2>/dev/null | wc -l || echo '0')\",
+    \"temp_dir_usage\": \"$(du -sm /tmp 2>/dev/null | awk '{print $1}' || echo '0')\"
+  }
+}"
+
+    # Collect diagnostic data
+    collect_diagnostic_data "$failure_stage" "$failure_reason"
+}
+
+# Collect diagnostic data automatically
+collect_diagnostic_data() {
+    local failure_stage="$1"
+    local failure_reason="$2"
+
+    DIAGNOSTIC_DATA="{
+  \"recent_logs\": {
+    \"system_messages\": \"$(journalctl --since '10 minutes ago' --priority=0..3 --no-pager -n 20 2>/dev/null | tail -10 | sed 's/"/\\"/g' | tr '\n' ';' || echo 'unavailable')\",
+    \"docker_logs\": \"$(journalctl -u docker --since '10 minutes ago' --no-pager -n 10 2>/dev/null | tail -5 | sed 's/"/\\"/g' | tr '\n' ';' || echo 'unavailable')\",
+    \"kernel_messages\": \"$(dmesg | tail -20 2>/dev/null | sed 's/"/\\"/g' | tr '\n' ';' || echo 'unavailable')\"
+  },
+  \"file_system\": {
+    \"disk_errors\": \"$(dmesg | grep -i 'error\|fail' | grep -i 'disk\|fs\|ext' | tail -5 2>/dev/null | sed 's/"/\\"/g' | tr '\n' ';' || echo 'none')\",
+    \"corrupted_files\": \"$(find . -name '*.deb' -size 0 2>/dev/null | head -5 | tr '\n' ';' || echo 'none')\",
+    \"permission_issues\": \"$(find . -name '*.log' -perm 000 2>/dev/null | head -5 | tr '\n' ';' || echo 'none')\"
+  },
+  \"network_diagnostics\": {
+    \"dns_resolution_time\": \"$(dig github.com +time=5 +tries=1 2>/dev/null | grep 'Query time' | awk '{print $4}' || echo 'failed')\",
+    \"connection_latency_ms\": \"$(ping -c 1 github.com 2>/dev/null | grep 'time=' | awk -F'time=' '{print $2}' | awk '{print $1}' || echo 'failed')\",
+    \"traceroute_hops\": \"$(traceroute -m 5 github.com 2>/dev/null | wc -l || echo '0')\",
+    \"port_connectivity\": \"$(timeout 3 bash -c 'echo >/dev/tcp/github.com/443' 2>/dev/null && echo 'success' || echo 'failed')\"
+  },
+  \"build_artifacts\": {
+    \"partial_packages\": \"$(find . -name '*.deb' -size +0c 2>/dev/null | wc -l || echo '0')\",
+    \"empty_packages\": \"$(find . -name '*.deb' -size 0 2>/dev/null | wc -l || echo '0')\",
+    \"corrupted_packages\": \"$(find . -name '*.deb' -exec file {} \; 2>/dev/null | grep -v 'Debian' | wc -l || echo '0')\",
+    \"log_files\": \"$(find . -name '*.log' -size +0c 2>/dev/null | wc -l || echo '0')\"
+  },
+  \"performance_indicators\": {
+    \"io_wait\": \"$(iostat -x 1 1 2>/dev/null | grep -E '(Device|$NETWORK_INTERFACE)' | tail -1 | awk '{print $10}' || echo '0')\",
+    \"context_switches\": \"$(vmstat 1 2 2>/dev/null | tail -1 | awk '{print $12}' || echo '0')\",
+    \"swap_activity\": \"$(vmstat 1 2 2>/dev/null | tail -1 | awk '{print $7}' || echo '0')\",
+    \"interrupts_per_sec\": \"$(vmstat 1 2 2>/dev/null | tail -1 | awk '{print $11}' || echo '0')\"
+  }
 }"
 }
 
@@ -1105,6 +1360,12 @@ get_telemetry_summary() {
             remediation_suggestions: .build_metrics.remediation_suggestions,
             retry_count: .build_metrics.retry_count,
             last_retry_attempt: .build_metrics.last_retry_attempt,
+            error_context: .build_metrics.error_context,
+            api_response_codes: .build_metrics.api_response_codes,
+            system_snapshot: .build_metrics.system_snapshot,
+            network_conditions: .build_metrics.network_conditions,
+            environment_details: .build_metrics.environment_details,
+            diagnostic_data: .build_metrics.diagnostic_data,
             docker_info: .build_metrics.docker_info,
             system_resources: .build_metrics.system_resources,
             performance_regressions: .performance_metrics.regressions_detected
@@ -1123,6 +1384,8 @@ export -f record_build_failure_with_retry
 export -f classify_failure_type
 export -f categorize_failure_enhanced
 export -f generate_detailed_failure_report
+export -f collect_error_context
+export -f collect_diagnostic_data
 export -f finalize_telemetry
 export -f get_telemetry_summary
 export -f save_as_baseline
