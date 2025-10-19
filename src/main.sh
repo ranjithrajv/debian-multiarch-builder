@@ -178,10 +178,6 @@ if [ "$ARCH" = "all" ]; then
             echo "  🎯 Attempted: $attempted_packages packages ($attempted_archs architectures)"
             echo "  ✅ Built: $TOTAL_PACKAGES packages"
             echo "  📈 Success Rate: $SUCCESS_RATE%"
-            if [ "$skipped_archs" -gt 0 ]; then
-                echo "  ⚠️  Skipped: $skipped_archs architectures (no release assets available)"
-            fi
-
             # Show which distributions were successfully built
             built_dists=$(ls ${PACKAGE_NAME}_*.deb 2>/dev/null | sed 's/.*+\([^_]*\)_[^_]*\.deb/\1/' | sort -u | tr '\n' ' ' | sed 's/ *$//')
             if [ -n "$built_dists" ]; then
@@ -197,9 +193,7 @@ if [ "$ARCH" = "all" ]; then
             # Show which architectures were not available for this version
             if [ "$skipped_archs" -gt 0 ]; then
                 skipped_list=$(cat /tmp/skipped_architectures.txt 2>/dev/null | tr '\n' ' ' | sed 's/ *$//')
-                if [ -n "$skipped_list" ]; then
-                    echo "  ⚠️  No release assets available for: $skipped_list"
-                fi
+                echo "  ⚠️  Skipped architectures (no release assets): $skipped_list"
             fi
 
             echo ""
