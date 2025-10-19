@@ -19,7 +19,7 @@ parse_config() {
     local config_dir=$(dirname "$config_file")
 
     # Initialize CI environment detection first
-    source "$SCRIPT_DIR/ci-optimization.sh"
+    source "$SCRIPT_DIR/../ci-optimization.sh"
     init_ci_optimization
 
     # New split configuration: package.yaml + optional overrides.yaml
