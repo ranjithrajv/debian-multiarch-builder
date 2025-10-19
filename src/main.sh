@@ -182,21 +182,24 @@ if [ "$ARCH" = "all" ]; then
                 echo "  ⚠️  Skipped: $skipped_archs architectures (no release assets available)"
             fi
 
-            # Show which architectures succeeded
-            built_archs=$(ls ${PACKAGE_NAME}_*.deb 2>/dev/null | sed "s/.*${PACKAGE_NAME}_.*+\([^-]*\)_.*\.deb/\1/" | sort -u)
-            if [ -n "$built_archs" ]; then
-                echo "  ✅ Successful Architectures: $built_archs"
+            # Show which distributions were successfully built
+            built_dists=$(ls ${PACKAGE_NAME}_*.deb 2>/dev/null | sed 's/.*+\([^_]*\)_[^_]*\.deb/\1/' | sort -u | tr '\n' ' ' | sed 's/ *$//')
+            if [ -n "$built_dists" ]; then
+                echo "  ✅ Built for distributions: $built_dists"
             fi
 
-            # Show which architectures failed (if any)
-            failed_archs=""
-            for arch in $ARCHITECTURES; do
-                if ! echo "$built_archs" | grep -q "$arch"; then
-                    failed_archs="$failed_archs $arch"
+            # Show which architectures were built (extract from package names)
+            built_archs=$(ls ${PACKAGE_NAME}_*.deb 2>/dev/null | sed 's/.*+\([^_]*\)_\([^\.]*\)\.deb/\2/' | sort -u | tr '\n' ' ' | sed 's/ *$//')
+            if [ -n "$built_archs" ]; then
+                echo "  🏗️  Built architectures: $built_archs"
+            fi
+
+            # Show which architectures were not available for this version
+            if [ "$skipped_archs" -gt 0 ]; then
+                skipped_list=$(cat /tmp/skipped_architectures.txt 2>/dev/null | tr '\n' ' ' | sed 's/ *$//')
+                if [ -n "$skipped_list" ]; then
+                    echo "  ⚠️  No release assets available for: $skipped_list"
                 fi
-            done
-            if [ -n "$failed_archs" ]; then
-                echo "  ❌ Skipped/Failed Architectures:$failed_archs"
             fi
 
             echo ""
