@@ -421,7 +421,9 @@ update_final_telemetry_data() {
     # Also output debug info to main log for visibility
     echo "🔍 TELEMETRY DEBUG: Duration=${build_duration}s, Memory=${PEAK_MEMORY_USAGE}MB, Down=${NETWORK_BYTES_DOWNLOADED}, Up=${NETWORK_BYTES_UPLOADED}"
 
+    echo "🔍 TELEMETRY: Starting yq updates..."
     if command -v yq >/dev/null 2>&1; then
+        echo "🔍 TELEMETRY: yq command found"
         # Use proper quoting for date values to avoid yq parsing issues
         local start_time_iso=$(date -d "@$BUILD_START_TIME" -Iseconds)
         local end_time_iso=$(date -d "@$BUILD_END_TIME" -Iseconds)
@@ -468,6 +470,8 @@ update_final_telemetry_data() {
         echo "ERROR: yq not available for telemetry updates" >> "$TELEMETRY_DIR/debug.log"
         echo "Warning: yq not available for telemetry updates"
     fi
+
+    echo "🔍 TELEMETRY: Finished yq updates"
 }
 
 # Check for performance regressions
