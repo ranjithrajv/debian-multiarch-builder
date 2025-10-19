@@ -162,9 +162,9 @@ start_resource_monitoring() {
             # Log resource sample
             echo "{\"timestamp\": $timestamp, \"memory_mb\": $mem_usage, \"cpu_percent\": $cpu_usage, \"cpu_avg_percent\": $((cpu_total / cpu_samples))}" >> "$TELEMETRY_DIR/resource-samples.log"
 
-            # Update exported peak values
-            PEAK_MEMORY_USAGE=$mem_usage
-            PEAK_CPU_USAGE=$peak_cpu
+            # Update exported peak values globally
+            export PEAK_MEMORY_USAGE=$mem_usage
+            export PEAK_CPU_USAGE=$peak_cpu
 
             sleep 3  # Sample every 3 seconds for more detailed monitoring
         done
@@ -202,27 +202,33 @@ get_current_memory_usage() {
 
 # Get current CPU usage percentage
 get_current_cpu_usage() {
-    # Get CPU usage for current process and system
-    local current_pid=$$
+    # Get system-wide CPU usage (simplified for reliability)
+    local cpu_line=$(grep '^cpu ' /proc/stat 2>/dev/null)
+    if [ -z "$cpu_line" ]; then
+        echo "0"
+        return
+    fi
 
-    # Get system CPU stats (total cpu time)
-    local cpu_line=$(grep '^cpu ' /proc/stat)
     local cpu_idle=$(echo "$cpu_line" | awk '{print $5}')
     local cpu_total=$(echo "$cpu_line" | awk '{s=0; for(i=2;i<=NF;i++) s+=$i; print s}')
 
-    # Wait a short time and get new stats
+    # Short delay to get delta
     sleep 0.1
-    local new_cpu_line=$(grep '^cpu ' /proc/stat)
+    local new_cpu_line=$(grep '^cpu ' /proc/stat 2>/dev/null)
+    if [ -z "$new_cpu_line" ]; then
+        echo "0"
+        return
+    fi
+
     local new_cpu_idle=$(echo "$new_cpu_line" | awk '{print $5}')
     local new_cpu_total=$(echo "$new_cpu_line" | awk '{s=0; for(i=2;i<=NF;i++) s+=$i; print s}')
 
-    # Calculate CPU usage percentage
+    # Calculate CPU usage
     local cpu_diff=$((new_cpu_total - cpu_total))
     local idle_diff=$((new_cpu_idle - cpu_idle))
 
     if [ "$cpu_diff" -gt 0 ]; then
         local cpu_usage=$((100 * (cpu_diff - idle_diff) / cpu_diff))
-        # Cap at 100%
         if [ "$cpu_usage" -gt 100 ]; then
             cpu_usage=100
         fi
@@ -499,60 +505,45 @@ update_final_telemetry_data() {
     echo "🔍 TELEMETRY: Starting yq updates..."
     if command -v yq >/dev/null 2>&1; then
         echo "🔍 TELEMETRY: yq command found"
+
+        # Check if telemetry file exists
+        if [ ! -f "$TELEMETRY_DATA_FILE" ]; then
+            echo "🔍 TELEMETRY ERROR: Telemetry file not found: $TELEMETRY_DATA_FILE"
+            return 1
+        fi
+
         # Use proper quoting for date values to avoid yq parsing issues
         local start_time_iso=$(date -d "@$BUILD_START_TIME" -Iseconds)
         local end_time_iso=$(date -d "@$BUILD_END_TIME" -Iseconds)
 
-        echo "DEBUG: yq available, updating telemetry file: $TELEMETRY_DATA_FILE" >> "$TELEMETRY_DIR/debug.log"
+        echo "🔍 TELEMETRY: Updating telemetry file: $TELEMETRY_DATA_FILE"
 
-        # Update telemetry with better error handling and logging
-        if yq eval ".build_session.start_time = \"$start_time_iso\"" -i "$TELEMETRY_DATA_FILE" 2>> "$TELEMETRY_DIR/debug.log"; then
-            echo "DEBUG: Updated start_time successfully" >> "$TELEMETRY_DIR/debug.log"
+        # Update all fields in single command to avoid file locking issues
+        if yq eval "
+            .build_session.start_time = \"$start_time_iso\" |
+            .build_session.end_time = \"$end_time_iso\" |
+            .build_session.duration_seconds = $build_duration |
+            .memory_metrics.peak_usage_mb = $PEAK_MEMORY_USAGE |
+            .cpu_metrics.peak_usage_percent = $PEAK_CPU_USAGE |
+            .network_metrics.bytes_downloaded = $NETWORK_BYTES_DOWNLOADED |
+            .network_metrics.bytes_uploaded = $NETWORK_BYTES_UPLOADED
+        " -i "$TELEMETRY_DATA_FILE"; then
+            echo "🔍 TELEMETRY: Successfully updated all telemetry fields"
+            echo "🔍 TELEMETRY: Duration=${build_duration}s, Memory=${PEAK_MEMORY_USAGE}MB, CPU=${PEAK_CPU_USAGE}%, Down=${NETWORK_BYTES_DOWNLOADED}, Up=${NETWORK_BYTES_UPLOADED}"
         else
-            echo "ERROR: Failed to update start_time" >> "$TELEMETRY_DIR/debug.log"
-        fi
+            echo "🔍 TELEMETRY ERROR: Failed to update telemetry file"
+            # Fall back to manual updates
+            echo "🔍 TELEMETRY: Trying individual field updates..."
 
-        if yq eval ".build_session.end_time = \"$end_time_iso\"" -i "$TELEMETRY_DATA_FILE" 2>> "$TELEMETRY_DIR/debug.log"; then
-            echo "DEBUG: Updated end_time successfully" >> "$TELEMETRY_DIR/debug.log"
-        else
-            echo "ERROR: Failed to update end_time" >> "$TELEMETRY_DIR/debug.log"
-        fi
-
-        if yq eval ".build_session.duration_seconds = $build_duration" -i "$TELEMETRY_DATA_FILE" 2>> "$TELEMETRY_DIR/debug.log"; then
-            echo "DEBUG: Updated duration successfully: $build_duration" >> "$TELEMETRY_DIR/debug.log"
-        else
-            echo "ERROR: Failed to update duration: $build_duration" >> "$TELEMETRY_DIR/debug.log"
-        fi
-
-        if yq eval ".memory_metrics.peak_usage_mb = $PEAK_MEMORY_USAGE" -i "$TELEMETRY_DATA_FILE" 2>> "$TELEMETRY_DIR/debug.log"; then
-            echo "DEBUG: Updated memory successfully: $PEAK_MEMORY_USAGE" >> "$TELEMETRY_DIR/debug.log"
-        else
-            echo "ERROR: Failed to update memory: $PEAK_MEMORY_USAGE" >> "$TELEMETRY_DIR/debug.log"
-        fi
-
-        if yq eval ".cpu_metrics.peak_usage_percent = $PEAK_CPU_USAGE" -i "$TELEMETRY_DATA_FILE" 2>> "$TELEMETRY_DIR/debug.log"; then
-            echo "DEBUG: Updated CPU successfully: $PEAK_CPU_USAGE" >> "$TELEMETRY_DIR/debug.log"
-        else
-            echo "ERROR: Failed to update CPU: $PEAK_CPU_USAGE" >> "$TELEMETRY_DIR/debug.log"
-        fi
-
-        if yq eval ".network_metrics.bytes_downloaded = $NETWORK_BYTES_DOWNLOADED" -i "$TELEMETRY_DATA_FILE" 2>> "$TELEMETRY_DIR/debug.log"; then
-            echo "DEBUG: Updated download bytes successfully: $NETWORK_BYTES_DOWNLOADED" >> "$TELEMETRY_DIR/debug.log"
-        else
-            echo "ERROR: Failed to update download bytes: $NETWORK_BYTES_DOWNLOADED" >> "$TELEMETRY_DIR/debug.log"
-        fi
-
-        if yq eval ".network_metrics.bytes_uploaded = $NETWORK_BYTES_UPLOADED" -i "$TELEMETRY_DATA_FILE" 2>> "$TELEMETRY_DIR/debug.log"; then
-            echo "DEBUG: Updated upload bytes successfully: $NETWORK_BYTES_UPLOADED" >> "$TELEMETRY_DIR/debug.log"
-        else
-            echo "ERROR: Failed to update upload bytes: $NETWORK_BYTES_UPLOADED" >> "$TELEMETRY_DIR/debug.log"
+            yq eval ".build_session.duration_seconds = $build_duration" -i "$TELEMETRY_DATA_FILE" || echo "ERROR: Failed to update duration"
+            yq eval ".memory_metrics.peak_usage_mb = $PEAK_MEMORY_USAGE" -i "$TELEMETRY_DATA_FILE" || echo "ERROR: Failed to update memory"
+            yq eval ".cpu_metrics.peak_usage_percent = $PEAK_CPU_USAGE" -i "$TELEMETRY_DATA_FILE" || echo "ERROR: Failed to update CPU"
+            yq eval ".network_metrics.bytes_downloaded = $NETWORK_BYTES_DOWNLOADED" -i "$TELEMETRY_DATA_FILE" || echo "ERROR: Failed to update download"
+            yq eval ".network_metrics.bytes_uploaded = $NETWORK_BYTES_UPLOADED" -i "$TELEMETRY_DATA_FILE" || echo "ERROR: Failed to update upload"
         fi
     else
-        echo "ERROR: yq not available for telemetry updates" >> "$TELEMETRY_DIR/debug.log"
-        echo "Warning: yq not available for telemetry updates"
+        echo "🔍 TELEMETRY ERROR: yq command not found"
     fi
-
-    echo "🔍 TELEMETRY: Finished yq updates"
 }
 
 # Check for performance regressions
