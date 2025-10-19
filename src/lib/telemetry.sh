@@ -771,6 +771,11 @@ finalize_telemetry() {
     fi
 
     # Kill monitoring processes
+    if [ -f "$TELEMETRY_DIR/resource-monitor.pid" ]; then
+        kill $(cat "$TELEMETRY_DIR/resource-monitor.pid") 2>/dev/null || true
+        rm -f "$TELEMETRY_DIR/resource-monitor.pid"
+    fi
+
     if [ -f "$TELEMETRY_DIR/memory-monitor.pid" ]; then
         kill $(cat "$TELEMETRY_DIR/memory-monitor.pid") 2>/dev/null || true
         rm -f "$TELEMETRY_DIR/memory-monitor.pid"
@@ -779,6 +784,21 @@ finalize_telemetry() {
     if [ -f "$TELEMETRY_DIR/network-monitor.pid" ]; then
         kill $(cat "$TELEMETRY_DIR/network-monitor.pid") 2>/dev/null || true
         rm -f "$TELEMETRY_DIR/network-monitor.pid"
+    fi
+
+    # Collect final resource peak values
+    if [ -f "$TELEMETRY_DIR/current-peak-memory.txt" ]; then
+        PEAK_MEMORY_USAGE=$(cat "$TELEMETRY_DIR/current-peak-memory.txt")
+        echo "Final peak memory usage: ${PEAK_MEMORY_USAGE}MB"
+    else
+        PEAK_MEMORY_USAGE=0
+    fi
+
+    if [ -f "$TELEMETRY_DIR/current-peak-cpu.txt" ]; then
+        PEAK_CPU_USAGE=$(cat "$TELEMETRY_DIR/current-peak-cpu.txt")
+        echo "Final peak CPU usage: ${PEAK_CPU_USAGE}%"
+    else
+        PEAK_CPU_USAGE=0
     fi
 
     # Calculate final network stats
