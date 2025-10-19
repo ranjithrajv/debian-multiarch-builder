@@ -1,0 +1,195 @@
+# Failure Classification and Remediation Rules
+# Contains rules for categorizing build failures and suggesting remediation steps
+
+failure_categories:
+  network_timeout:
+    patterns:
+      - "(timeout|timed out|connection.*refused|connection.*reset|network.*unreachable)"
+    failure_type: "transient"
+    category_enhanced: "network_timeout"
+    remediation_suggestions:
+      - "Check internet connectivity"
+      - "Verify firewall settings"
+      - "Try again in a few minutes"
+      - "Consider using a different network"
+      - "Check GitHub status (githubstatus.com)"
+  
+  resource_missing:
+    patterns:
+      - "(404|not found|file.*missing|resource.*missing|no such file)"
+    failure_type: "permanent"
+    category_enhanced: "resource_missing"
+    remediation_suggestions:
+      - "Verify version exists in upstream repository"
+      - "Check release asset naming convention"
+      - "Update release patterns in config"
+      - "Verify GitHub repository URL"
+      - "Check if version was released properly"
+
+  permission_error:
+    patterns:
+      - "(permission.*denied|access.*denied|unauthorized|401|403)"
+    failure_type: "permanent"
+    category_enhanced: "permission_error"
+    remediation_suggestions:
+      - "Check file/directory permissions"
+      - "Verify Docker daemon access"
+      - "Run with appropriate user privileges"
+      - "Check GitHub token permissions"
+      - "Verify repository access rights"
+
+  resource_exhaustion:
+    patterns:
+      - "(disk.*full|no.*space.*left|resource.*exhaustion)"
+    failure_type: "permanent"
+    category_enhanced: "resource_exhaustion"
+    remediation_suggestions:
+      - "Free up disk space"
+      - "Clean Docker cache: docker system prune -af"
+      - "Remove temporary files"
+      - "Use a larger disk/volume"
+      - "Check available memory with 'free -h'"
+
+  memory_exhaustion:
+    patterns:
+      - "(memory|out.*of.*memory|oom.*killer)"
+    failure_type: "permanent"
+    category_enhanced: "memory_exhaustion"
+    remediation_suggestions:
+      - "Increase available RAM"
+      - "Reduce parallel build jobs"
+      - "Close other applications"
+      - "Add swap space if needed"
+      - "Use a machine with more memory"
+
+  docker_registry:
+    patterns:
+      - "(docker.*pull|registry|manifest|image)"
+    failure_type: "transient"
+    category_enhanced: "docker_registry"
+    remediation_suggestions:
+      - "Check Docker daemon status"
+      - "Verify internet connectivity"
+      - "Try manual docker pull"
+      - "Check Docker Hub status"
+      - "Restart Docker service"
+
+  dependency_error:
+    patterns:
+      - "(dependency|apt|dpkg|package.*install)"
+    failure_type: "permanent"
+    category_enhanced: "dependency_error"
+    remediation_suggestions:
+      - "Update package lists: apt update"
+      - "Check package availability"
+      - "Verify repository configuration"
+      - "Install missing dependencies manually"
+      - "Check distribution compatibility"
+
+  architecture_error:
+    patterns:
+      - "(architecture|cross|qemu|multiarch|unsupported.*platform)"
+    failure_type: "permanent"
+    category_enhanced: "architecture_error"
+    remediation_suggestions:
+      - "Verify architecture support in config"
+      - "Check qemu-user-static installation"
+      - "Update cross-compilation setup"
+      - "Verify target architecture exists"
+      - "Check distribution support for architecture"
+
+  configuration_error:
+    patterns:
+      - "(syntax|parse|invalid.*format|yaml|json|invalid.*config|configuration.*error|missing.*config)"
+    failure_type: "permanent"
+    category_enhanced: "configuration_error"
+    remediation_suggestions:
+      - "Validate configuration file syntax"
+      - "Check YAML/JSON formatting"
+      - "Verify required fields are present"
+      - "Use linter for config validation"
+      - "Check example configuration files"
+
+  compilation_error:
+    patterns:
+      - "(compile|build|make|cmake|gcc|clang)"
+    failure_type: "permanent"
+    category_enhanced: "compilation_error"
+    remediation_suggestions:
+      - "Check compiler version compatibility"
+      - "Verify build dependencies"
+      - "Check source code for syntax errors"
+      - "Review build logs for specific errors"
+      - "Try building with verbose output"
+
+  rate_limiting:
+    patterns:
+      - "(rate.*limit|too.*many.*requests|429)"
+    failure_type: "transient"
+    category_enhanced: "rate_limiting"
+    remediation_suggestions:
+      - "Wait before retrying (exponential backoff)"
+      - "Use GitHub token with higher limits"
+      - "Reduce request frequency"
+      - "Cache responses when possible"
+      - "Consider GitHub API rate limits"
+
+  dockerfile_error:
+    patterns:
+      - "(dockerfile|invalid.*instruction)"
+    failure_type: "permanent"
+    category_enhanced: "dockerfile_error"
+    remediation_suggestions:
+      - "Validate Dockerfile syntax"
+      - "Check base image availability"
+      - "Verify instruction parameters"
+      - "Test Docker build locally"
+      - "Review Docker best practices"
+
+  docker_missing_files:
+    patterns:
+      - "(no such file|not found|file.*missing|command.*not found)"
+    failure_type: "permanent"
+    category_enhanced: "docker_missing_files"
+    remediation_suggestions:
+      - "Verify file paths in Dockerfile"
+      - "Check if required files exist in build context"
+      - "Verify binary source path configuration"
+      - "Ensure all required assets are available"
+      - "Check Docker build context"
+
+  docker_permission:
+    patterns:
+      - "(permission|denied|access|cannot.*open)"
+    failure_type: "permanent"
+    category_enhanced: "docker_permission"
+    remediation_suggestions:
+      - "Check file permissions in container"
+      - "Verify Docker daemon access rights"
+      - "Run Docker commands with appropriate privileges"
+      - "Check user/group permissions in Dockerfile"
+      - "Verify container security context"
+
+  docker_resource:
+    patterns:
+      - "(memory|disk|space|resource|no space left)"
+    failure_type: "permanent"
+    category_enhanced: "docker_resource"
+    remediation_suggestions:
+      - "Increase container memory limits"
+      - "Free up disk space in container"
+      - "Optimize Docker image size"
+      - "Check Docker resource constraints"
+      - "Verify available system resources"
+  
+  docker_network:
+    patterns:
+      - "(network|connection|timeout|download|pull)"
+    failure_type: "transient"
+    category_enhanced: "docker_network"
+    remediation_suggestions:
+      - "Check network connectivity in container"
+      - "Verify Docker network configuration"
+      - "Test external connectivity from container"
+      - "Check Docker daemon network settings"
+      - "Verify DNS resolution in container"

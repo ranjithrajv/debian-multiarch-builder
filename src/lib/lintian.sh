@@ -32,8 +32,8 @@ get_lintian_config() {
     local default=$2
 
     # Check if lintian config exists in parsed config
-    if [ -f "$SCRIPT_DIR/defaults.yaml" ]; then
-        local value=$(yq eval ".lintian.$key // \"$default\"" "$SCRIPT_DIR/defaults.yaml" 2>/dev/null)
+    if [ -f "$SCRIPT_DIR/data/defaults.yaml" ]; then
+        local value=$(yq eval ".lintian.$key // \"$default\"" "$SCRIPT_DIR/data/defaults.yaml" 2>/dev/null)
         echo "$value"
     else
         echo "$default"

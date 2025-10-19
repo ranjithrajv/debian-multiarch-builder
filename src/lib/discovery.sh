@@ -2,25 +2,18 @@
 
 # Architecture pattern discovery functions
 
-# Architecture pattern mappings for auto-discovery
-# Maps Debian arch to common upstream naming patterns
-declare -A ARCH_PATTERNS=(
-    ["amd64"]="x86_64|amd64|x64"
-    ["arm64"]="aarch64|arm64"
-    ["armel"]="arm-|armeabi"
-    ["armhf"]="armv7|armhf|arm-.*gnueabihf"
-    ["i386"]="i686|i386|x86"
-    ["ppc64el"]="powerpc64le|ppc64le"
-    ["s390x"]="s390x"
-    ["riscv64"]="riscv64gc|riscv64"
-)
+# Source YAML utilities for loading externalized configuration
+source "$SCRIPT_DIR/data/yaml-utils.sh"
+
+# Load architecture patterns data
+load_architecture_patterns
 
 # Function to auto-discover release pattern for an architecture
 auto_discover_pattern() {
     local arch=$1
-    local pattern="${ARCH_PATTERNS[$arch]}"
+    local pattern=$(get_architecture_pattern "$arch")
 
-    if [ -z "$pattern" ]; then
+    if [ -z "$pattern" ] || [ "$pattern" = "null" ]; then
         return 1
     fi
 
@@ -34,15 +27,17 @@ auto_discover_pattern() {
         grep -iE "$pattern" | \
         grep -i "linux")
 
-    # Prefer gnu builds (better for Debian), then musl builds, then any linux build
-    local matched_asset=$(echo "$filtered_assets" | grep -i "gnu" | head -1)
-    if [ -z "$matched_asset" ]; then
-        matched_asset=$(echo "$filtered_assets" | grep -i "musl" | head -1)
-    fi
-    if [ -z "$matched_asset" ]; then
-        matched_asset=$(echo "$filtered_assets" | head -1)
-    fi
+    # Prefer builds based on auto-discovery preferences
+    for build_type in $(get_auto_discovery_preferences); do
+        local matched_asset=$(echo "$filtered_assets" | grep -i "$build_type" | head -1)
+        if [ -n "$matched_asset" ]; then
+            echo "$matched_asset"
+            return 0
+        fi
+    done
 
+    # Fallback to first match if no preferred build type found
+    local matched_asset=$(echo "$filtered_assets" | head -1)
     if [ -z "$matched_asset" ]; then
         return 1
     fi

@@ -1,0 +1,77 @@
+# Valid Debian distributions
+# Contains information about Debian releases and their characteristics
+
+distributions:
+  valid:
+    - bookworm    # Debian 12 (stable)
+    - trixie      # Debian 13 (testing)
+    - forky       # Debian 14 (future)
+    - sid         # Debian unstable
+
+  details:
+    bookworm:
+      version: "12"
+      status: oldstable
+      release_date: "2023-06-10"
+      security_support_ends: "2026-06-10"
+      lts_support_ends: "2028-06-30"
+      description: "Debian 12 (stable)"
+
+    trixie:
+      version: "13"
+      status: stable
+      release_date: "2025-08-09"
+      security_support_ends: "2028-08-09"
+      lts_support_ends: "2030-06-30"
+      description: "Debian 13 (stable)"
+
+    forky:
+      version: "14"
+      status: testing
+      release_date: null  # Not yet released
+      security_support_ends: null
+      lts_support_ends: null
+      description: "Debian 14 (future)"
+
+    sid:
+      version: "unstable"
+      status: perpetual
+      release_date: null  # Rolling release
+      security_support_ends: null
+      lts_support_ends: null
+      description: "Debian unstable (rolling)"
+
+# Default architectures for each distribution
+default_architectures:
+  bookworm:
+    - amd64
+    - arm64
+    - armel  # Last version as regular architecture
+    - armhf
+    - i386   # Deprecated in Trixie+
+    - ppc64el
+    - s390x
+
+  trixie:
+    - amd64
+    - arm64
+    - armhf
+    - ppc64el
+    - s390x
+    - riscv64  # Introduced in Trixie
+
+  forky:
+    - amd64
+    - arm64
+    - armhf
+    - ppc64el
+    - s390x
+    - riscv64
+
+  sid:
+    - amd64
+    - arm64
+    - armhf
+    - ppc64el
+    - s390x
+    - riscv64

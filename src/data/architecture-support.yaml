@@ -1,0 +1,56 @@
+# Debian-specific architecture support matrix
+# Contains Debian policy information for architecture support across distributions
+
+debian_architecture_support:
+  # i386 deprecated in Trixie (v13), only in Bookworm (v12)
+  i386:
+    supported_distributions: ["bookworm"]
+    reason: "Deprecated in Trixie (v13+)"
+    eol_date: "2026-06"
+    status: "deprecated"
+  
+  # armel last version in Bookworm (v12) as regular architecture
+  armel:
+    supported_distributions: ["bookworm"]
+    reason: "Last version in Bookworm as regular architecture"
+    eol_date: "2026-06"
+    note: "May be available as ports architecture in Trixie+"
+    status: "end-of-life"
+  
+  # riscv64 introduced in Trixie (v13)
+  riscv64:
+    supported_distributions: ["trixie", "forky", "sid"]
+    reason: "Introduced in Trixie (v13)"
+    note: "Not available in Bookworm"
+    status: "new"
+
+# Universal architectures (all distributions)
+universal_architectures:
+  - amd64
+  - arm64
+  - armhf
+  - ppc64el
+  - s390x
+
+# Distribution-restricted architectures
+restricted_architectures:
+  i386:
+    distributions:
+      - bookworm
+    reason: "Deprecated in Trixie (v13+)"
+    eol_date: "2026-06"
+
+  armel:
+    distributions:
+      - bookworm
+    reason: "Last version in Bookworm as regular architecture"
+    eol_date: "2026-06"
+    note: "May be available as ports architecture in Trixie+"
+
+  riscv64:
+    distributions:
+      - trixie
+      - forky
+      - sid
+    reason: "Introduced in Trixie (v13)"
+    note: "Not available in Bookworm"

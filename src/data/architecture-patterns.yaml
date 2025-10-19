@@ -1,0 +1,26 @@
+# Architecture naming patterns for auto-discovery
+# Maps Debian architectures to common upstream naming conventions
+# These are industry-standard patterns
+
+architecture_patterns:
+  amd64: "x86_64|amd64|x64"
+  arm64: "aarch64|arm64"
+  armel: "arm-|armeabi"
+  armhf: "armv7|armhf|arm-.*gnueabihf"
+  i386: "i686|i386|x86"
+  ppc64el: "powerpc64le|ppc64le"
+  s390x: "s390x"
+  riscv64: "riscv64gc|riscv64"
+
+# Auto-discovery preferences - order of preference for build types
+auto_discovery_preferences:
+  # Most users prefer gnu builds (native to Debian) over musl
+  - "gnu"
+  - "musl"
+  - "linux"
+
+# Exclude patterns when filtering release assets
+exclude_patterns:
+  - "sha256"
+  - "checksum"
+  - "source"

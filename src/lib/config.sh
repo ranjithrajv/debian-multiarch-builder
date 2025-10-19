@@ -104,7 +104,7 @@ parse_config() {
     DISTRIBUTIONS=$(yq eval '.debian_distributions[]' "$package_file" 2>/dev/null | tr '\n' ' ')
     if [ -z "$DISTRIBUTIONS" ] || [ "$DISTRIBUTIONS" = "null" ]; then
         # Load default distributions from system.yaml
-        local system_yaml="$SCRIPT_DIR/system.yaml"
+        local system_yaml="$SCRIPT_DIR/data/system.yaml"
         DISTRIBUTIONS=$(yq eval '.distributions.valid[]' "$system_yaml" 2>/dev/null | tr '\n' ' ')
         info "No distributions specified, using defaults: $DISTRIBUTIONS"
     fi
@@ -130,7 +130,7 @@ parse_config() {
     ARCH_COUNT=$(yq eval '.architectures | length' "$package_file")
     if [ "$ARCH_COUNT" = "0" ] || [ "$ARCH_COUNT" = "null" ]; then
         # Load default architectures from system.yaml (universal + restricted)
-        local system_yaml="$SCRIPT_DIR/system.yaml"
+        local system_yaml="$SCRIPT_DIR/data/system.yaml"
         local universal_archs=$(yq eval '.architecture_support.universal[]' "$system_yaml" 2>/dev/null | tr '\n' ' ')
         local restricted_archs=$(yq eval '.architecture_support.restricted | keys | .[]' "$system_yaml" 2>/dev/null | tr '\n' ' ')
 

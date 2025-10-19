@@ -3,6 +3,9 @@
 # Enhanced Build Telemetry and Metrics Collection
 # Provides comprehensive build monitoring and performance analysis
 
+# Source YAML utilities for loading externalized configuration
+source "$SCRIPT_DIR/data/yaml-utils.sh"
+
 # Global telemetry configuration
 TELEMETRY_DIR=".telemetry"
 TELEMETRY_ENABLED="${TELEMETRY_ENABLED:-true}"
@@ -561,105 +564,14 @@ categorize_failure_enhanced() {
     local reason="$2"
     local code="$3"
 
-    # Network-related errors with remediation
-    if echo "$reason" | grep -qi -E "(timeout|timed out|connection.*refused|connection.*reset|network.*unreachable)"; then
-        FAILURE_CATEGORY_ENHANCED="network_timeout"
-        REMEDIATION_SUGGESTIONS="1. Check internet connectivity
-2. Verify firewall settings
-3. Try again in a few minutes
-4. Consider using a different network
-5. Check GitHub status (githubstatus.com)"
-
-    elif echo "$reason" | grep -qi -E "(404|not found|file.*missing|resource.*missing)"; then
-        FAILURE_CATEGORY_ENHANCED="resource_missing"
-        REMEDIATION_SUGGESTIONS="1. Verify version exists in upstream repository
-2. Check release asset naming convention
-3. Update release patterns in config
-4. Verify GitHub repository URL
-5. Check if version was released properly"
-
-    elif echo "$reason" | grep -qi -E "(permission.*denied|access.*denied|unauthorized|401|403)"; then
-        FAILURE_CATEGORY_ENHANCED="permission_error"
-        REMEDIATION_SUGGESTIONS="1. Check file/directory permissions
-2. Verify Docker daemon access
-3. Run with appropriate user privileges
-4. Check GitHub token permissions
-5. Verify repository access rights"
-
-    elif echo "$reason" | grep -qi -E "(disk.*full|no.*space.*left|resource.*exhaustion)"; then
-        FAILURE_CATEGORY_ENHANCED="resource_exhaustion"
-        REMEDIATION_SUGGESTIONS="1. Free up disk space
-2. Clean Docker cache: docker system prune -af
-3. Remove temporary files
-4. Use a larger disk/volume
-5. Check available memory with 'free -h'"
-
-    elif echo "$reason" | grep -qi -E "(memory|out.*of.*memory|oom.*killer)"; then
-        FAILURE_CATEGORY_ENHANCED="memory_exhaustion"
-        REMEDIATION_SUGGESTIONS="1. Increase available RAM
-2. Reduce parallel build jobs
-3. Close other applications
-4. Add swap space if needed
-5. Use a machine with more memory"
-
-    elif echo "$reason" | grep -qi -E "(docker.*pull|registry|manifest|image)"; then
-        FAILURE_CATEGORY_ENHANCED="docker_registry"
-        REMEDIATION_SUGGESTIONS="1. Check Docker daemon status
-2. Verify internet connectivity
-3. Try manual docker pull
-4. Check Docker Hub status
-5. Restart Docker service"
-
-    elif echo "$reason" | grep -qi -E "(dependency|apt|dpkg|package.*install)"; then
-        FAILURE_CATEGORY_ENHANCED="dependency_error"
-        REMEDIATION_SUGGESTIONS="1. Update package lists: apt update
-2. Check package availability
-3. Verify repository configuration
-4. Install missing dependencies manually
-5. Check distribution compatibility"
-
-    elif echo "$reason" | grep -qi -E "(architecture|cross|qemu|multiarch|unsupported.*platform)"; then
-        FAILURE_CATEGORY_ENHANCED="architecture_error"
-        REMEDIATION_SUGGESTIONS="1. Verify architecture support in config
-2. Check qemu-user-static installation
-3. Update cross-compilation setup
-4. Verify target architecture exists
-5. Check distribution support for architecture"
-
-    elif echo "$reason" | grep -qi -E "(syntax|parse|invalid.*format|yaml|json)"; then
-        FAILURE_CATEGORY_ENHANCED="configuration_error"
-        REMEDIATION_SUGGESTIONS="1. Validate configuration file syntax
-2. Check YAML/JSON formatting
-3. Verify required fields are present
-4. Use linter for config validation
-5. Check example configuration files"
-
-    elif echo "$reason" | grep -qi -E "(compile|build|make|cmake|gcc|clang)"; then
-        FAILURE_CATEGORY_ENHANCED="compilation_error"
-        REMEDIATION_SUGGESTIONS="1. Check compiler version compatibility
-2. Verify build dependencies
-3. Check source code for syntax errors
-4. Review build logs for specific errors
-5. Try building with verbose output"
-
-    elif echo "$reason" | grep -qi -E "(rate.*limit|too.*many.*requests|429)"; then
-        FAILURE_CATEGORY_ENHANCED="rate_limiting"
-        REMEDIATION_SUGGESTIONS="1. Wait before retrying (exponential backoff)
-2. Use GitHub token with higher limits
-3. Reduce request frequency
-4. Cache responses when possible
-5. Consider GitHub API rate limits"
-
-    elif echo "$reason" | grep -qi -E "(dockerfile|invalid.*instruction)"; then
-        FAILURE_CATEGORY_ENHANCED="dockerfile_error"
-        REMEDIATION_SUGGESTIONS="1. Validate Dockerfile syntax
-2. Check base image availability
-3. Verify instruction parameters
-4. Test Docker build locally
-5. Review Docker best practices"
-
-    else
-        FAILURE_CATEGORY_ENHANCED="unknown_error"
+    # Use YAML-based failure classification
+    read -r category failure_type category_enhanced remediation_suggestions < <(get_failure_classification "$reason")
+    
+    FAILURE_CATEGORY_ENHANCED="$category_enhanced"
+    REMEDIATION_SUGGESTIONS="$remediation_suggestions"
+    
+    # If no match found in YAML, use default
+    if [ "$FAILURE_CATEGORY_ENHANCED" = "unknown_error" ]; then
         REMEDIATION_SUGGESTIONS="1. Check complete build logs
 2. Reproduce error locally
 3. Search for similar issues online

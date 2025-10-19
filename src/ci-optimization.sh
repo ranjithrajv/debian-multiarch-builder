@@ -3,6 +3,12 @@
 # GitHub Actions Optimization and CI Environment Detection
 # Provides auto-detection of runner specifications and resource-based optimization
 
+# Source YAML utilities for loading externalized configuration
+source "$SCRIPT_DIR/data/yaml-utils.sh"
+
+# Load CI environment specifications
+load_ci_environment_specs
+
 # CI environment detection variables
 export CI_ENVIRONMENT detected=false
 export RUNNER_TYPE="unknown"
@@ -13,53 +19,6 @@ export IS_GITHUB_ACTIONS=false
 export IS_CI_ENVIRONMENT=false
 export OPTIMIZED_PARALLEL_JOBS=2
 export RESOURCE_BASED_LIMITS=true
-
-# GitHub Actions runner specifications
-declare -A GITHUB_RUNNER_SPECS=(
-    ["ubuntu-latest"]="2_core_7gb"
-    ["ubuntu-22.04"]="2_core_7gb"
-    ["ubuntu-20.04"]="2_core_7gb"
-    ["ubuntu-24.04"]="4_core_16gb"
-    ["windows-latest"]="2_core_7gb"
-    ["windows-2022"]="2_core_7gb"
-    ["windows-2019"]="2_core_7gb"
-    ["macos-latest"]="3_core_14gb"
-    ["macos-13"]="3_core_14gb"
-    ["macos-14"]="4_core_16gb"
-    ["macos-15"]="4_core_16gb"
-)
-
-# Runner specifications mapping (cores_memory_gb_disk_gb)
-declare -A RUNNER_SPECIFICATIONS=(
-    ["2_core_7gb"]="2:7:14"
-    ["4_core_16gb"]="4:16:100"
-    ["8_core_32gb"]="8:32:200"
-    ["16_core_64gb"]="16:64:400"
-    ["32_core_128gb"]="32:128:800"
-    ["large_runner_linux"]="4_core_16gb"
-    ["large_runner_windows"]="8_core_32gb"
-    ["large_runner_macos"]="4_core_16gb"
-)
-
-# Resource-based parallel job limits
-declare -A RESOURCE_PARALLEL_LIMITS=(
-    ["1:2"]="1"      # 1 core, 2GB RAM - 1 job
-    ["1:4"]="1"      # 1 core, 4GB RAM - 1 job
-    ["2:4"]="1"      # 2 cores, 4GB RAM - 1 job
-    ["2:7"]="2"      # 2 cores, 7GB RAM - 2 jobs (GitHub Actions standard)
-    ["2:8"]="2"      # 2 cores, 8GB RAM - 2 jobs
-    ["4:8"]="2"      # 4 cores, 8GB RAM - 2 jobs
-    ["4:16"]="4"     # 4 cores, 16GB RAM - 4 jobs
-    ["4:32"]="4"     # 4 cores, 32GB RAM - 4 jobs
-    ["8:16"]="4"     # 8 cores, 16GB RAM - 4 jobs
-    ["8:32"]="6"     # 8 cores, 32GB RAM - 6 jobs
-    ["8:64"]="8"     # 8 cores, 64GB RAM - 8 jobs
-    ["16:32"]="6"    # 16 cores, 32GB RAM - 6 jobs
-    ["16:64"]="12"   # 16 cores, 64GB RAM - 12 jobs
-    ["16:128"]="16"  # 16 cores, 128GB RAM - 16 jobs
-    ["32:64"]="12"   # 32 cores, 64GB RAM - 12 jobs
-    ["32:128"]="24"  # 32 cores, 128GB RAM - 24 jobs
-)
 
 # Detect GitHub Actions environment
 detect_github_actions() {
@@ -302,6 +261,12 @@ calculate_optimal_parallel_jobs() {
         if [ $calculated_limit -lt 1 ]; then
             calculated_limit=1
         fi
+    fi
+
+    # Apply resource-based limits from configuration (if available)
+    local resource_limit=$(get_resource_parallel_limit $RUNNER_CPU_CORES $RUNNER_MEMORY_GB)
+    if [ -n "$resource_limit" ] && [ "$resource_limit" != "null" ] && [ $resource_limit -lt $calculated_limit ]; then
+        calculated_limit=$resource_limit
     fi
 
     # Apply maximum limits to prevent resource exhaustion

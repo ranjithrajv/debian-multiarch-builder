@@ -1,0 +1,125 @@
+# CI/CD Environment Specifications
+# Configuration for different CI/CD platforms and their resource specifications
+
+github_actions:
+  runner_specs:
+    "ubuntu-latest":
+      cores: 2
+      memory_gb: 7
+      disk_gb: 14
+      type: "github-actions-ubuntu-standard"
+    "ubuntu-22.04":
+      cores: 2
+      memory_gb: 7
+      disk_gb: 14
+      type: "github-actions-ubuntu-standard"
+    "ubuntu-20.04":
+      cores: 2
+      memory_gb: 7
+      disk_gb: 14
+      type: "github-actions-ubuntu-standard"
+    "ubuntu-24.04":
+      cores: 4
+      memory_gb: 16
+      disk_gb: 100
+      type: "github-actions-ubuntu-24.04"
+    "windows-latest":
+      cores: 2
+      memory_gb: 7
+      disk_gb: 100
+      type: "github-actions-windows-standard"
+    "windows-2022":
+      cores: 2
+      memory_gb: 7
+      disk_gb: 100
+      type: "github-actions-windows-standard"
+    "windows-2019":
+      cores: 2
+      memory_gb: 7
+      disk_gb: 100
+      type: "github-actions-windows-standard"
+    "macos-latest":
+      cores: 3
+      memory_gb: 14
+      disk_gb: 50
+      type: "github-actions-macos-13"
+    "macos-13":
+      cores: 3
+      memory_gb: 14
+      disk_gb: 50
+      type: "github-actions-macos-13"
+    "macos-14":
+      cores: 4
+      memory_gb: 16
+      disk_gb: 50
+      type: "github-actions-macos-14"
+    "macos-15":
+      cores: 4
+      memory_gb: 16
+      disk_gb: 100
+      type: "github-actions-macos-large"
+
+  large_runners:
+    "large_runner_linux":
+      cores: 4
+      memory_gb: 16
+      disk_gb: 100
+      type: "github-actions-large-linux-4core"
+    "large_runner_windows":
+      cores: 8
+      memory_gb: 32
+      disk_gb: 200
+      type: "github-actions-large-windows-8core"
+    "large_runner_macos":
+      cores: 4
+      memory_gb: 16
+      disk_gb: 100
+      type: "github-actions-large-macos-4core"
+
+# Resource-based parallel job limits
+# Format: "cores:memory_gb" -> max_parallel_jobs
+resource_parallel_limits:
+  "1:2": 1      # 1 core, 2GB RAM - 1 job
+  "1:4": 1      # 1 core, 4GB RAM - 1 job
+  "2:4": 1      # 2 cores, 4GB RAM - 1 job
+  "2:7": 2      # 2 cores, 7GB RAM - 2 jobs (GitHub Actions standard)
+  "2:8": 2      # 2 cores, 8GB RAM - 2 jobs
+  "4:8": 2      # 4 cores, 8GB RAM - 2 jobs
+  "4:16": 4     # 4 cores, 16GB RAM - 4 jobs
+  "4:32": 4     # 4 cores, 32GB RAM - 4 jobs
+  "8:16": 4     # 8 cores, 16GB RAM - 4 jobs
+  "8:32": 6     # 8 cores, 32GB RAM - 6 jobs
+  "8:64": 8     # 8 cores, 64GB RAM - 8 jobs
+  "16:32": 6    # 16 cores, 32GB RAM - 6 jobs
+  "16:64": 12   # 16 cores, 64GB RAM - 12 jobs
+  "16:128": 16  # 16 cores, 128GB RAM - 16 jobs
+  "32:64": 12   # 32 cores, 64GB RAM - 12 jobs
+  "32:128": 24  # 32 cores, 128GB RAM - 24 jobs
+
+# Resource allocation parameters
+resource_allocation:
+  min_memory_per_job_mb: 1024
+  min_cores_per_job: 1
+  min_disk_per_job_gb: 5
+  safety_margin_cores: 1
+  safety_margin_memory_gb: 1
+
+# CI Environment detection configuration
+ci_detection:
+  environments:
+    gitlab_ci:
+      variable: "GITLAB_CI"
+      value: "true"
+    azure_devops:
+      variable: "TF_BUILD"
+      value: "true"
+    jenkins:
+      variable: "JENKINS_URL"
+    circleci:
+      variable: "CIRCLECI"
+      value: "true"
+    travis_ci:
+      variable: "TRAVIS"
+      value: "true"
+    bitbucket_pipelines:
+      variable: "BITBUCKET_BUILD_NUMBER"
