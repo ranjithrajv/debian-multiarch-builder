@@ -199,6 +199,15 @@ if [ "$ARCH" = "all" ]; then
             echo ""
             echo "✅ Total: $TOTAL_PACKAGES packages successfully built"
 
+            # Show resource usage summary
+            if [ "$TELEMETRY_ENABLED" = "true" ] && [ -f ".telemetry/current-peak-memory.txt" ]; then
+                peak_mem=$(cat .telemetry/current-peak-memory.txt 2>/dev/null || echo "0")
+                peak_cpu=$(cat .telemetry/current-peak-cpu.txt 2>/dev/null || echo "0")
+                if [ "$peak_mem" -gt 0 ] || [ "$peak_cpu" -gt 0 ]; then
+                    echo "  📊 Resource Usage: Peak ${peak_mem}MB memory, Peak ${peak_cpu}% CPU"
+                fi
+            fi
+
             # Generate build summary JSON
             generate_build_summary
 

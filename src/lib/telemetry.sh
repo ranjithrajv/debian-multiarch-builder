@@ -14,7 +14,9 @@ BASELINE_DATA_FILE="$TELEMETRY_DIR/baseline.json"
 export BUILD_START_TIME=""
 export BUILD_END_TIME=""
 export PEAK_MEMORY_USAGE=0
+export PEAK_CPU_USAGE=0
 export CURRENT_MEMORY_USAGE=0
+export CURRENT_CPU_USAGE=0
 export NETWORK_BYTES_DOWNLOADED=0
 export NETWORK_BYTES_UPLOADED=0
 export BUILD_FAILURE_CATEGORY=""
@@ -61,6 +63,13 @@ init_telemetry() {
   },
   "memory_metrics": {
     "peak_usage_mb": 0,
+    "average_usage_mb": 0,
+    "samples": []
+  },
+  "cpu_metrics": {
+    "peak_usage_percent": 0,
+    "average_usage_percent": 0,
+    "total_samples": 0,
     "samples": []
   },
   "network_metrics": {
@@ -102,7 +111,7 @@ EOF
         BUILD_START_TIME=$(date +%s)
     fi
 
-    start_memory_monitoring
+    start_resource_monitoring
     start_network_monitoring
 
     # Collect Docker and system information for failure diagnosis
@@ -112,40 +121,67 @@ EOF
     info "Telemetry system initialized with Docker and system info"
 }
 
-# Memory usage monitoring
-start_memory_monitoring() {
+# Resource usage monitoring (CPU + Memory)
+start_resource_monitoring() {
     if [ "$TELEMETRY_ENABLED" != "true" ]; then
         return 0
     fi
 
-    echo "Starting memory monitoring..."
+    echo "Starting resource monitoring (CPU + Memory)..."
 
-    # Monitor memory in background with exported variables
+    # Monitor resources in background with exported variables
     {
-        echo "Memory monitor started: $$" >> "$TELEMETRY_DIR/memory-monitor.log"
-        while [ -f "$TELEMETRY_DIR/monitoring.active" ]; do
-            local mem_usage=$(get_current_memory_usage)
-            local timestamp=$(date +%s)
+        echo "Resource monitor started: $$" >> "$TELEMETRY_DIR/resource-monitor.log"
 
-            # Update peak memory in a file to avoid race conditions
-            current_peak=$(cat "$TELEMETRY_DIR/current-peak-memory.txt" 2>/dev/null || echo "0")
-            if [ "$mem_usage" -gt "$current_peak" ]; then
+        # Initialize tracking variables
+        local cpu_total=0
+        local cpu_samples=0
+        local peak_cpu=0
+
+        while [ -f "$TELEMETRY_DIR/monitoring.active" ]; do
+            local timestamp=$(date +%s)
+            local mem_usage=$(get_current_memory_usage)
+            local cpu_usage=$(get_current_cpu_usage)
+
+            # Update peak memory
+            current_peak_mem=$(cat "$TELEMETRY_DIR/current-peak-memory.txt" 2>/dev/null || echo "0")
+            if [ "$mem_usage" -gt "$current_peak_mem" ]; then
                 echo "$mem_usage" > "$TELEMETRY_DIR/current-peak-memory.txt"
             fi
 
-            # Log memory sample
-            echo "{\"timestamp\": $timestamp, \"memory_mb\": $mem_usage}" >> "$TELEMETRY_DIR/memory-samples.log"
+            # Update peak CPU
+            if [ "$cpu_usage" -gt "$peak_cpu" ]; then
+                peak_cpu=$cpu_usage
+                echo "$peak_cpu" > "$TELEMETRY_DIR/current-peak-cpu.txt"
+            fi
 
-            sleep 5  # Sample every 5 seconds
+            # Track CPU samples for averaging
+            cpu_total=$((cpu_total + cpu_usage))
+            cpu_samples=$((cpu_samples + 1))
+
+            # Log resource sample
+            echo "{\"timestamp\": $timestamp, \"memory_mb\": $mem_usage, \"cpu_percent\": $cpu_usage, \"cpu_avg_percent\": $((cpu_total / cpu_samples))}" >> "$TELEMETRY_DIR/resource-samples.log"
+
+            # Update exported peak values
+            PEAK_MEMORY_USAGE=$mem_usage
+            PEAK_CPU_USAGE=$peak_cpu
+
+            sleep 3  # Sample every 3 seconds for more detailed monitoring
         done
-        echo "Memory monitor stopped" >> "$TELEMETRY_DIR/memory-monitor.log"
+        echo "Resource monitor stopped" >> "$TELEMETRY_DIR/resource-monitor.log"
     } &
 
     # Create monitoring flag
     touch "$TELEMETRY_DIR/monitoring.active"
-    echo $! > "$TELEMETRY_DIR/memory-monitor.pid"
+    echo $! > "$TELEMETRY_DIR/resource-monitor.pid"
     echo "0" > "$TELEMETRY_DIR/current-peak-memory.txt"
-    echo "Memory monitoring started with PID: $!"
+    echo "0" > "$TELEMETRY_DIR/current-peak-cpu.txt"
+    echo "Resource monitoring started with PID: $!"
+}
+
+# Legacy memory monitoring function (kept for compatibility)
+start_memory_monitoring() {
+    start_resource_monitoring
 }
 
 # Get current memory usage in MB
@@ -162,6 +198,38 @@ get_current_memory_usage() {
     done
 
     echo $((total_mem / 1024))  # Convert KB to MB
+}
+
+# Get current CPU usage percentage
+get_current_cpu_usage() {
+    # Get CPU usage for current process and system
+    local current_pid=$$
+
+    # Get system CPU stats (total cpu time)
+    local cpu_line=$(grep '^cpu ' /proc/stat)
+    local cpu_idle=$(echo "$cpu_line" | awk '{print $5}')
+    local cpu_total=$(echo "$cpu_line" | awk '{s=0; for(i=2;i<=NF;i++) s+=$i; print s}')
+
+    # Wait a short time and get new stats
+    sleep 0.1
+    local new_cpu_line=$(grep '^cpu ' /proc/stat)
+    local new_cpu_idle=$(echo "$new_cpu_line" | awk '{print $5}')
+    local new_cpu_total=$(echo "$new_cpu_line" | awk '{s=0; for(i=2;i<=NF;i++) s+=$i; print s}')
+
+    # Calculate CPU usage percentage
+    local cpu_diff=$((new_cpu_total - cpu_total))
+    local idle_diff=$((new_cpu_idle - cpu_idle))
+
+    if [ "$cpu_diff" -gt 0 ]; then
+        local cpu_usage=$((100 * (cpu_diff - idle_diff) / cpu_diff))
+        # Cap at 100%
+        if [ "$cpu_usage" -gt 100 ]; then
+            cpu_usage=100
+        fi
+        echo "$cpu_usage"
+    else
+        echo "0"
+    fi
 }
 
 # Network usage monitoring
@@ -408,7 +476,7 @@ update_final_telemetry_data() {
     # Debug: Log key values
     echo "DEBUG: BUILD_START_TIME=$BUILD_START_TIME, BUILD_END_TIME=$BUILD_END_TIME, duration=$build_duration" >> "$TELEMETRY_DIR/debug.log"
 
-    # Read peak memory from file to get latest value
+    # Read peak memory and CPU from files to get latest values
     if [ -f "$TELEMETRY_DIR/current-peak-memory.txt" ]; then
         PEAK_MEMORY_USAGE=$(cat "$TELEMETRY_DIR/current-peak-memory.txt")
         echo "DEBUG: PEAK_MEMORY_USAGE=$PEAK_MEMORY_USAGE" >> "$TELEMETRY_DIR/debug.log"
@@ -416,10 +484,17 @@ update_final_telemetry_data() {
         echo "DEBUG: No peak memory file found" >> "$TELEMETRY_DIR/debug.log"
     fi
 
+    if [ -f "$TELEMETRY_DIR/current-peak-cpu.txt" ]; then
+        PEAK_CPU_USAGE=$(cat "$TELEMETRY_DIR/current-peak-cpu.txt")
+        echo "DEBUG: PEAK_CPU_USAGE=$PEAK_CPU_USAGE" >> "$TELEMETRY_DIR/debug.log"
+    else
+        echo "DEBUG: No peak CPU file found" >> "$TELEMETRY_DIR/debug.log"
+    fi
+
     echo "DEBUG: NETWORK_BYTES_DOWNLOADED=$NETWORK_BYTES_DOWNLOADED, NETWORK_BYTES_UPLOADED=$NETWORK_BYTES_UPLOADED" >> "$TELEMETRY_DIR/debug.log"
 
     # Also output debug info to main log for visibility
-    echo "🔍 TELEMETRY DEBUG: Duration=${build_duration}s, Memory=${PEAK_MEMORY_USAGE}MB, Down=${NETWORK_BYTES_DOWNLOADED}, Up=${NETWORK_BYTES_UPLOADED}"
+    echo "🔍 TELEMETRY DEBUG: Duration=${build_duration}s, Memory=${PEAK_MEMORY_USAGE}MB, CPU=${PEAK_CPU_USAGE}%, Down=${NETWORK_BYTES_DOWNLOADED}, Up=${NETWORK_BYTES_UPLOADED}"
 
     echo "🔍 TELEMETRY: Starting yq updates..."
     if command -v yq >/dev/null 2>&1; then
@@ -453,6 +528,12 @@ update_final_telemetry_data() {
             echo "DEBUG: Updated memory successfully: $PEAK_MEMORY_USAGE" >> "$TELEMETRY_DIR/debug.log"
         else
             echo "ERROR: Failed to update memory: $PEAK_MEMORY_USAGE" >> "$TELEMETRY_DIR/debug.log"
+        fi
+
+        if yq eval ".cpu_metrics.peak_usage_percent = $PEAK_CPU_USAGE" -i "$TELEMETRY_DATA_FILE" 2>> "$TELEMETRY_DIR/debug.log"; then
+            echo "DEBUG: Updated CPU successfully: $PEAK_CPU_USAGE" >> "$TELEMETRY_DIR/debug.log"
+        else
+            echo "ERROR: Failed to update CPU: $PEAK_CPU_USAGE" >> "$TELEMETRY_DIR/debug.log"
         fi
 
         if yq eval ".network_metrics.bytes_downloaded = $NETWORK_BYTES_DOWNLOADED" -i "$TELEMETRY_DATA_FILE" 2>> "$TELEMETRY_DIR/debug.log"; then
@@ -646,6 +727,7 @@ get_telemetry_summary() {
         jq '{
             build_duration_seconds: .build_session.duration_seconds,
             peak_memory_mb: .memory_metrics.peak_usage_mb,
+            peak_cpu_percent: .cpu_metrics.peak_usage_percent,
             network_downloaded_bytes: .network_metrics.bytes_downloaded,
             network_uploaded_bytes: .network_metrics.bytes_uploaded,
             failure_category: .build_metrics.failure_category,
