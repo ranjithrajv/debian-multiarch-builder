@@ -418,6 +418,9 @@ update_final_telemetry_data() {
 
     echo "DEBUG: NETWORK_BYTES_DOWNLOADED=$NETWORK_BYTES_DOWNLOADED, NETWORK_BYTES_UPLOADED=$NETWORK_BYTES_UPLOADED" >> "$TELEMETRY_DIR/debug.log"
 
+    # Also output debug info to main log for visibility
+    echo "🔍 TELEMETRY DEBUG: Duration=${build_duration}s, Memory=${PEAK_MEMORY_USAGE}MB, Down=${NETWORK_BYTES_DOWNLOADED}, Up=${NETWORK_BYTES_UPLOADED}"
+
     if command -v yq >/dev/null 2>&1; then
         # Use proper quoting for date values to avoid yq parsing issues
         local start_time_iso=$(date -d "@$BUILD_START_TIME" -Iseconds)
