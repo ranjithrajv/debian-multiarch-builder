@@ -11,6 +11,22 @@ A reusable GitHub Action for building Debian packages across multiple architectu
 *   **Reduce Configuration:** With auto-discovery, you don't have to worry about manually configuring the release patterns for each architecture. The action does it for you.
 *   **Gain Insight:** The build summary and real-time progress tracking give you a clear view of your build process, so you can quickly identify and resolve any issues.
 
+## Supported Debian Versions and Architectures
+
+This action supports multiple Debian distributions and architectures. The table below shows the currently supported combinations:
+
+| Debian Version | Codename | Status | Supported Architectures |
+|----------------|----------|--------|-------------------------|
+| 12 | bookworm | oldstable | amd64, arm64, armel, armhf, i386, ppc64el, s390x |
+| 13 | trixie | stable | amd64, arm64, armhf, ppc64el, s390x, riscv64 |
+| 14 | forky | testing | amd64, arm64, armhf, ppc64el, s390x, riscv64 |
+| unstable | sid | perpetual | amd64, arm64, armhf, ppc64el, s390x, riscv64 |
+
+**Architecture Notes:**
+- `i386` and `armel` are deprecated in Debian 13 (trixie) and later versions
+- `riscv64` was introduced in Debian 13 (trixie) and is not available in bookworm
+- All distributions support the universal architectures: `amd64`, `arm64`, `armhf`, `ppc64el`, and `s390x`
+
 ## Documentation
 
 - **[Quick Start Guide](docs/quick-start-guide.md)** - How to get started
