@@ -173,7 +173,7 @@ architectures:
 ## Architecture Support
 
 ### Supported Architectures
-- amd64, arm64, armel, armhf, i386, ppc64el, s390x, riscv64
+- amd64, arm64, armel, armhf, i386, ppc64el, s390x, riscv64, loong64
 
 ### Distribution Support
 - bookworm (Debian 12 - stable)

@@ -25,17 +25,32 @@ handle_build_error() {
 # Set error trap
 trap 'handle_build_error $LINENO' ERR
 
-# Source all library modules
-source "$SCRIPT_DIR/lib/utils.sh"
+# Source all library modules (modular structure)
+
+# Core utilities
+source "$SCRIPT_DIR/lib/logging.sh"
+source "$SCRIPT_DIR/lib/file-utils.sh"
+source "$SCRIPT_DIR/lib/system-utils.sh"
+source "$SCRIPT_DIR/lib/package-utils.sh"
+source "$SCRIPT_DIR/lib/reporting.sh"
+source "$SCRIPT_DIR/lib/architecture-tracking.sh"
+
+# Configuration and validation
 source "$SCRIPT_DIR/lib/config.sh"
+source "$SCRIPT_DIR/lib/validation-core.sh"
 source "$SCRIPT_DIR/lib/github-api.sh"
 source "$SCRIPT_DIR/lib/discovery.sh"
 source "$SCRIPT_DIR/lib/validation.sh"
 source "$SCRIPT_DIR/lib/lintian.sh"
-source "$SCRIPT_DIR/lib/telemetry.sh"
+
+# Build system
 source "$SCRIPT_DIR/lib/build.sh"
 source "$SCRIPT_DIR/lib/orchestration.sh"
 source "$SCRIPT_DIR/lib/summary.sh"
+
+# Legacy telemetry (temporarily disabled until fully modularized)
+source "$SCRIPT_DIR/lib/telemetry.sh.backup"
+TELEMETRY_ENABLED=false
 
 # Parse command-line arguments
 CONFIG_FILE=$1
@@ -57,12 +72,64 @@ if [ -z "$CONFIG_FILE" ] || [ -z "$VERSION" ] || [ -z "$BUILD_VERSION" ]; then
     echo "  $0 config.yaml 2.35.0 1 arm64    # Build for arm64 only"
     echo "  $0 config.yaml 2.35.0 1 all      # Build for all architectures"
     echo ""
-    echo "Supported architectures: amd64, arm64, armel, armhf, i386, ppc64el, s390x, riscv64"
+    echo "Supported architectures: amd64, arm64, armel, armhf, i386, ppc64el, s390x, riscv64, loong64"
     exit 1
 fi
 
 # Parse and validate configuration
 parse_config "$CONFIG_FILE"
+
+# If auto-detection was needed and we now have access to discovery functions
+if [ "$ARTIFACT_FORMAT_AUTO_DETECT_NEEDED" = "true" ]; then
+    info "Performing artifact format auto-detection..."
+    
+    # Try to detect the format by checking available architectures and release patterns
+    local arch_array=($(get_supported_architectures))
+    if [ ${#arch_array[@]} -gt 0 ]; then
+        # Try to detect format from the first available architecture
+        local first_arch="${arch_array[0]}"
+        local release_pattern=$(get_release_pattern "$first_arch" 2>/dev/null)
+        
+        if [ -n "$release_pattern" ]; then
+            # Use the detection function from discovery.sh
+            local detected_format=$(detect_artifact_format "$release_pattern")
+            if [ $? -eq 0 ] && [ -n "$detected_format" ]; then
+                ARTIFACT_FORMAT="$detected_format"
+                info "Auto-detected artifact format: $ARTIFACT_FORMAT (from: $release_pattern)"
+            else
+                info "Could not determine format from release pattern, using default: tar.gz"
+                ARTIFACT_FORMAT="tar.gz"
+            fi
+        else
+            # Try to get any pattern by forcing auto-discovery for the first architecture
+            # We'll try to get the first pattern from the actual release assets
+            local assets=$(fetch_release_assets 2>/dev/null)
+            if [ -n "$assets" ]; then
+                # Get the first asset to detect format
+                local first_asset=$(echo "$assets" | head -1)
+                if [ -n "$first_asset" ]; then
+                    local detected_format=$(detect_artifact_format "$first_asset")
+                    if [ $? -eq 0 ] && [ -n "$detected_format" ]; then
+                        ARTIFACT_FORMAT="$detected_format"
+                        info "Auto-detected artifact format: $ARTIFACT_FORMAT (from first release asset: $first_asset)"
+                    else
+                        info "Could not determine format from first release asset, using default: tar.gz"
+                        ARTIFACT_FORMAT="tar.gz"
+                    fi
+                else
+                    info "No release assets found, using default: tar.gz"
+                    ARTIFACT_FORMAT="tar.gz"
+                fi
+            else
+                info "Could not fetch release assets for detection, using default: tar.gz"
+                ARTIFACT_FORMAT="tar.gz"
+            fi
+        fi
+    else
+        info "No architectures defined for detection, using default: tar.gz"
+        ARTIFACT_FORMAT="tar.gz"
+    fi
+fi
 
 # Check for required tools
 check_requirements

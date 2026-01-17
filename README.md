@@ -19,13 +19,15 @@ This action supports multiple Debian distributions and architectures. The table 
 |----------------|----------|--------|-------------------------|
 | 12 | bookworm | oldstable | amd64, arm64, armel, armhf, i386, ppc64el, s390x |
 | 13 | trixie | stable | amd64, arm64, armhf, ppc64el, s390x, riscv64 |
-| 14 | forky | testing | amd64, arm64, armhf, ppc64el, s390x, riscv64 |
-| unstable | sid | perpetual | amd64, arm64, armhf, ppc64el, s390x, riscv64 |
+| 14 | forky | testing | amd64, arm64, armhf, ppc64el, s390x, riscv64, loong64 |
+| unstable | sid | perpetual | amd64, arm64, armhf, ppc64el, s390x, riscv64, loong64 |
 
 **Architecture Notes:**
 - `i386` and `armel` are deprecated in Debian 13 (trixie) and later versions
 - `riscv64` was introduced in Debian 13 (trixie) and is not available in bookworm
+- `loong64` was officially promoted to supported architecture in Debian 14 (forky) and is not available in trixie or bookworm
 - All distributions support the universal architectures: `amd64`, `arm64`, `armhf`, `ppc64el`, and `s390x`
+- `loong64` is the Debian architecture name for LoongArch processors
 
 ## Documentation
 

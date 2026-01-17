@@ -1,5 +1,5 @@
 # Example configuration demonstrating user overrides for distribution-specific architecture support
-# NOTE: The action has built-in rules for i386, armel, and riscv64
+# NOTE: The action has built-in rules for i386, armel, riscv64, and loong64
 # This example shows how to override those rules if your upstream supports different distributions
 package_name: example-package
 github_repo: owner/repository
@@ -32,6 +32,7 @@ architectures:
 #   - i386: Bookworm only
 #   - armel: Bookworm only
 #   - riscv64: Trixie+ only
+#   - loong64: Forky+ only
 #
 # Only use distribution_arch_overrides if your upstream has different support
 # Example: if upstream still provides armel for Trixie:

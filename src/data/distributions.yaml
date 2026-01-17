@@ -67,6 +67,7 @@ default_architectures:
     - ppc64el
     - s390x
     - riscv64
+    - loong64
 
   sid:
     - amd64
@@ -75,3 +76,4 @@ default_architectures:
     - ppc64el
     - s390x
     - riscv64
+    - loong64
