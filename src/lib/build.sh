@@ -10,11 +10,21 @@ build_distribution() {
 
     FULL_VERSION="${VERSION}-${BUILD_VERSION}+${dist}_${build_arch}"
 
-    # Enhanced Docker build with failure capture
+    # Enhanced Docker build with BuildKit optimization and failure capture
     local docker_build_log="/tmp/docker-build-${dist}-${build_arch}.log"
-
-    if ! docker build . -t "${PACKAGE_NAME}-${dist}-${build_arch}" \
-        -f "$SCRIPT_DIR/Dockerfile" \
+    local cache_dir="/tmp/docker-cache-${dist}-${build_arch}"
+    
+    # Enable Docker BuildKit for better performance
+    export DOCKER_BUILDKIT=1
+    
+    # Create cache directory for this build and setup shared cache
+    mkdir -p "$cache_dir"
+    mkdir -p "/tmp/docker-cache-shared"
+    
+    if ! docker build \
+        --progress=plain \
+        --tag "${PACKAGE_NAME}-${dist}-${build_arch}" \
+        --file "$SCRIPT_DIR/Dockerfile" \
         --build-arg DEBIAN_DIST="$dist" \
         --build-arg PACKAGE_NAME="$PACKAGE_NAME" \
         --build-arg VERSION="$VERSION" \
@@ -22,7 +32,10 @@ build_distribution() {
         --build-arg FULL_VERSION="$FULL_VERSION" \
         --build-arg ARCH="$build_arch" \
         --build-arg BINARY_SOURCE="$binary_source" \
-        --build-arg GITHUB_REPO="$GITHUB_REPO" 2>&1 | tee "$docker_build_log"; then
+        --build-arg GITHUB_REPO="$GITHUB_REPO" \
+        --cache-from "type=local,src=/tmp/docker-cache-shared" \
+        --cache-to "type=local,dest=${cache_dir},mode=max" \
+        . 2>&1 | tee "$docker_build_log"; then
 
         # Capture Docker build failure details for telemetry
         local docker_error=$(tail -20 "$docker_build_log" | grep -E "(ERROR|error|Error|failed|Failed|FAILED)" | head -5 | tr '\n' '; ' | sed 's/; $//')
@@ -68,15 +81,33 @@ build_distribution() {
     # Clean up successful build log
     rm -f "$docker_build_log" 2>/dev/null || true
 
-    id="$(docker create "${PACKAGE_NAME}-${dist}-${build_arch}")"
-    if ! docker cp "$id:/${PACKAGE_NAME}_${FULL_VERSION}.deb" - > "./${PACKAGE_NAME}_${FULL_VERSION}.deb" 2>&1; then
-        docker rm "$id" || true
-        return 1
+    # Extract package from multi-stage build (optimized extraction)
+    local container_name="extract-${PACKAGE_NAME}-${dist}-${build_arch}-$$"
+    if ! docker run --name "$container_name" --rm \
+        "${PACKAGE_NAME}-${dist}-${build_arch}" \
+        cat "/${PACKAGE_NAME}_${FULL_VERSION}.deb" > "./${PACKAGE_NAME}_${FULL_VERSION}.deb" 2>&1; then
+        # Fallback to create/copy method if run fails
+        id="$(docker create "${PACKAGE_NAME}-${dist}-${build_arch}" 2>/dev/null || echo "")"
+        if [ -n "$id" ]; then
+            if docker cp "$id:/${PACKAGE_NAME}_${FULL_VERSION}.deb" "./${PACKAGE_NAME}_${FULL_VERSION}.deb" 2>&1; then
+                docker rm "$id" || true
+            else
+                docker rm "$id" || true
+                return 1
+            fi
+        else
+            return 1
+        fi
     fi
+    
+    # Clean up Docker image to save space
+    docker rmi "${PACKAGE_NAME}-${dist}-${build_arch}" 2>/dev/null || true
+    
+    # Clean up cache directory (optional - keep for shared cache)
+    # rm -rf "$cache_dir" 2>/dev/null || true
 
-    docker rm "$id" || true
-
-    if ! tar -xf "./${PACKAGE_NAME}_${FULL_VERSION}.deb" 2>&1; then
+    # Verify the .deb package was created and is non-empty
+    if [ ! -s "./${PACKAGE_NAME}_${FULL_VERSION}.deb" ]; then
         return 1
     fi
 
@@ -122,11 +153,17 @@ build_architecture() {
         rm -f "$archive_name" || true
     fi
 
-    # Download the release artifact (ONCE for all distributions)
-    local download_url="https://github.com/${GITHUB_REPO}/releases/download/${VERSION}/${release_pattern}"
-    info "Downloading from: $download_url"
-
+    # Download the release artifact with caching
+    info "Preparing to download: $release_pattern"
+    
+    # Get expected checksum if available
+    local expected_checksum=""
+    if command -v fetch_checksum_for_asset >/dev/null 2>&1; then
+        expected_checksum=$(fetch_checksum_for_asset "$release_pattern" 2>/dev/null || echo "")
+    fi
+    
     # Validate release exists before downloading
+    local download_url="https://github.com/${GITHUB_REPO}/releases/download/${VERSION}/${release_pattern}"
     if ! validate_release "$download_url"; then
         error "Release not found: $download_url
 
@@ -139,12 +176,14 @@ Please check:
   1. https://github.com/${GITHUB_REPO}/releases/tag/${VERSION}
   2. Verify the release_pattern in your config matches actual release assets"
     fi
-
-    if ! wget -q --show-progress "$download_url" 2>&1; then
-        error "Failed to download release for $build_arch from $download_url"
+    
+    # Source download cache library
+    source "$SCRIPT_DIR/download-cache.sh"
+    
+    # Download with caching
+    if ! download_release_asset "$release_pattern" "$archive_name" "$expected_checksum"; then
+        error "Failed to download release for $build_arch"
     fi
-
-    success "Downloaded $archive_name"
 
     # Verify checksum if available
     verify_checksum "$archive_name" "$release_pattern"
