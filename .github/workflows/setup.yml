@@ -34,22 +34,18 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Setup Wizard
+        env:
+          GITHUB_REPO: ${{ github.event.inputs.github_repo }}
+          TARGET_VERSION: ${{ github.event.inputs.version }}
         run: |
           # Clone the builder
           git clone https://github.com/ranjithrajv/debian-multiarch-builder.git /tmp/builder
           cd /tmp/builder
-          
+
           # Run setup wizard (non-interactive mode)
-          ./build.sh --setup << EOF
-y
-${{ github.event.inputs.github_repo }}
-y
-${{ github.event.inputs.version }}
-y
-.github/build-config.yaml
-y
-EOF
-          
+          printf 'y\n%s\ny\n%s\ny\n.github/build-config.yaml\ny\n' \
+            "$GITHUB_REPO" "$TARGET_VERSION" | ./build.sh --setup
+
           # Copy generated config to working directory
           cp /tmp/builder/.github/build-config.yaml $GITHUB_WORKSPACE/ || true
           
