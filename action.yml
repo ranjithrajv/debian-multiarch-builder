@@ -144,10 +144,13 @@ runs:
         echo "Architecture: $ARCHITECTURE"
 
         # Copy build infrastructure from action to working directory
-        cp -r "$ACTION_PATH/src" ./src
-        cp -r "$ACTION_PATH/templates" ./templates
-        cp "$ACTION_PATH/build.sh" ./build.sh
-        cp "$ACTION_PATH/Dockerfile" ./src/Dockerfile
+        # Skip if action is already running from the workspace (uses: ./)
+        if [ "$(realpath "$ACTION_PATH")" != "$(realpath .)" ]; then
+          cp -r "$ACTION_PATH/src" ./src
+          cp -r "$ACTION_PATH/templates" ./templates
+          cp "$ACTION_PATH/build.sh" ./build.sh
+          cp "$ACTION_PATH/Dockerfile" ./src/Dockerfile
+        fi
         chmod +x ./build.sh ./src/main.sh ./src/lib/*.sh
 
         # Run the build
