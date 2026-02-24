@@ -238,25 +238,7 @@ build_all_architectures_parallel() {
             fi
         done
 
-        # Implement exponential backoff polling
-        local sleep_duration=0.1
-        local max_sleep=2.0
-        
-        # If no builds are active, sleep longer
-        if [ ${#pids[@]} -eq 0 ]; then
-            sleep_duration=1.0
-        fi
-        
-        sleep $sleep_duration
-        
-        # Gradually increase sleep duration if we're polling frequently
-        if [ "$sleep_duration" -lt "$max_sleep" ]; then
-            sleep_duration=$(echo "$sleep_duration * 1.5" | bc -l 2>/dev/null || echo "1.0")
-            # Cap at max_sleep
-            if [ "$(echo "$sleep_duration > $max_sleep" | bc -l 2>/dev/null || echo "0")" = "1" ]; then
-                sleep_duration=$max_sleep
-            fi
-        fi
+        sleep 1
     done
 
     # Check for any failures and provide detailed summary
