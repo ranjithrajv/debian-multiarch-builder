@@ -6,91 +6,120 @@ A reusable GitHub Action for building Debian packages across multiple architectu
 
 Get started in minutes by following these steps. This example shows how to build the [`eza`](https://github.com/eza-community/eza) package.
 
-### 1. Create a Configuration File
+### Option 1: Auto-Discovery Mode (Fastest - No Configuration Required!)
 
-First, create a YAML file to tell the action about your package. This file defines where to find the source releases and how to map architectures.
+Build directly from a GitHub repository without creating any configuration files:
 
-**`examples/quick-start-config.yaml`**
+```bash
+./build.sh --ad eza-community/eza v0.23.4 1
+```
+
+Or in a GitHub Actions workflow:
+
 ```yaml
-# Minimal configuration for building the 'eza' package
-# See docs/configuration-reference.md for all options
+- name: Build with Auto-Discovery
+  run: |
+    git clone https://github.com/ranjithrajv/debian-multiarch-builder.git /tmp/builder
+    /tmp/builder/build.sh --ad eza-community/eza v0.23.4 1
+```
 
+### Option 2: Interactive Setup Wizard
+
+Let the wizard generate a configuration for you:
+
+```bash
+./build.sh --setup
+```
+
+The wizard will:
+1. Detect your GitHub repository
+2. Fetch the latest release version
+3. Auto-detect download patterns
+4. Generate a configuration file
+
+### Option 3: Use a Template
+
+Copy a pre-built template for popular projects:
+
+```bash
+cp templates/rust/eza.yaml .github/build-config.yaml
+```
+
+Available templates:
+- **Rust:** eza, bat, ripgrep, generic
+- **Go:** hugo, kubectl, generic
+- **C/C++:** neovim, generic
+- **Node.js, Python, Ruby:** generic templates
+
+### Option 4: Manual Configuration
+
+Create a configuration file manually:
+
+**`.github/build-config.yaml`**
+```yaml
 package_name: "eza"
 github_repo: "eza-community/eza"
 summary: "A modern replacement for ls"
-vendor: "Eza Community"
 license: "MIT"
 
-# Defines how to find release artifacts.
-# The action will replace '{version}' and '{arch}' dynamically.
 download_pattern: "eza_v{version}_{arch}-unknown-linux-gnu.tar.gz"
 
-# Mapping from Debian architecture names to the names used in release artifacts.
 architecture_map:
   amd64: "x86_64"
   arm64: "aarch64"
   armhf: "armv7"
 ```
-> [!TIP]
-> This is a minimal configuration. For advanced options like adding dependencies or custom scripts, see the [Configuration Reference](docs/configuration-reference.md).
 
-### 2. Create a GitHub Actions Workflow
-
-Next, create a workflow file in your repository at `.github/workflows/build.yml`. This workflow will trigger the build process.
+### Create a GitHub Actions Workflow
 
 **`.github/workflows/build.yml`**
 
-> **Performance:** Builds all 9 architectures in parallel — each in its own GitHub Actions runner. Total build time equals the longest single architecture (typically ~8 minutes), not the sum. Docker layer caching reduces re-run times by ~60%.
-
 ```yaml
-# Minimal workflow to build the 'eza' package
-# See docs/usage-guide.md for more examples
-
-name: Build Eza Package
+name: Build Debian Package
 
 on:
-  workflow_dispatch: # Allows you to run this workflow manually
+  workflow_dispatch:
     inputs:
       version:
-        description: 'Eza version to build (e.g., 0.18.0)'
+        description: 'Version to build'
         required: true
-        default: '0.18.0'
+        default: 'v0.23.4'
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Build Debian Package
+      - uses: actions/checkout@v4
+      
+      - name: Build Package
         uses: ranjithrajv/debian-multiarch-builder@v1
         with:
-          config-file: 'examples/quick-start-config.yaml'
+          config-file: .github/build-config.yaml
           version: ${{ github.event.inputs.version }}
-          build-version: '1' # Debian package revision
+          build-version: '1'
 
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: eza-debian-packages
+          name: debian-packages
           path: "*.deb"
 ```
 
-### 3. Run the Workflow
+### Run the Workflow
 
-That's it! You can now run this workflow from the "Actions" tab of your GitHub repository. It will build the `.deb` packages for the architectures defined in your config and upload them as artifacts.
+Go to the **Actions** tab in your GitHub repository, select the workflow, and click **Run workflow**.
 
 ---
 
 ## Why Use This Action?
 
-*   **Simplify Your Workflow:** Instead of wrestling with complex build scripts, you can build your Debian packages with a single, easy-to-use GitHub Action.
-*   **Save Time:** With multi-level parallelization and download caching, you can build your packages up to 80% faster than with a traditional sequential build process.
-*   **Improve Security:** The action automatically verifies the checksums of your release artifacts, so you can be confident that you're building from a secure source.
-*   **Ensure Package Quality:** With built-in Lintian integration, you can automatically check your packages for common errors and policy violations.
-*   **Reduce Configuration:** With auto-discovery, you don't have to worry about manually configuring the release patterns for each architecture. The action does it for you.
-*   **Gain Insight:** The build summary and real-time progress tracking give you a clear view of your build process, so you can quickly identify and resolve any issues.
+*   **🚀 Auto-Discovery Mode** - Build from any GitHub repo without configuration
+*   **🧙 Setup Wizard** - Interactive wizard generates config automatically  
+*   **⚡ 80% Faster Builds** - Multi-level parallelization and intelligent caching
+*   **🔒 Secure by Default** - Automatic checksum verification for all downloads
+*   **✅ Quality Assurance** - Built-in Lintian integration for package validation
+*   **📊 Real-time Progress** - Live build status with architecture-level tracking
+*   **📦 12+ Templates** - Pre-built configs for popular Rust, Go, and C/C++ projects
+*   **🤖 Auto-Discovery** - Automatically detects release patterns from GitHub
 
 ## Supported Debian Versions and Architectures
 
@@ -114,21 +143,40 @@ This action supports multiple Debian distributions and architectures. The table 
 
 ## Documentation
 
+### Getting Started
 - **[Quick Start Guide](docs/quick-start-guide.md)** - How to get started
-- **[Core Concepts](docs/core-concepts.md)** - Core concepts of the action
-- **[Best Practices](docs/best-practices.md)** - Best practices for using the action
-- **[Configuration Reference](docs/configuration-reference.md)** - Detailed configuration reference
-- **[Performance Tuning](docs/performance-tuning.md)** - Performance tuning and parallel builds
-- **[Auto-Discovery](docs/auto-discovery.md)** - How auto-discovery works
-- **[Security Guide](docs/security-guide.md)** - Checksum verification
-- **[Build Summary](docs/build-summary.md)** - CI/CD integration guide
-- **[Lintian Integration](docs/lintian-integration.md)** - Package quality validation with lintian
-- **[Telemetry Guide](docs/telemetry-guide.md)** - Enhanced build metrics and monitoring
-- **[Project Structure](docs/project-structure.md)** - Codebase organization
 - **[Usage Guide](docs/usage-guide.md)** - Detailed usage instructions and examples
+- **[Core Concepts](docs/core-concepts.md)** - Core concepts of the action
+
+### Features
+- **[Auto-Discovery Mode](docs/auto-discovery.md)** - Build without configuration files
+- **[Setup Wizard](docs/setup-wizard.md)** - Interactive configuration generator
+- **[Templates](templates/README.md)** - Pre-built configurations for popular projects
+- **[Auto-Discovery](docs/auto-discovery.md)** - How auto-discovery works
+
+### Configuration
+- **[Configuration Reference](docs/configuration-reference.md)** - Detailed configuration reference
+- **[Best Practices](docs/best-practices.md)** - Best practices for using the action
+
+### Performance
+- **[Performance Tuning](docs/performance-tuning.md)** - Performance tuning and parallel builds
 - **[Build Monitoring](docs/build-monitoring.md)** - Build output, progress tracking, and monitoring
+
+### Quality & Security
+- **[Security Guide](docs/security-guide.md)** - Checksum verification
+- **[Lintian Integration](docs/lintian-integration.md)** - Package quality validation with lintian
+
+### CI/CD Integration
+- **[Build Summary](docs/build-summary.md)** - CI/CD integration guide
+- **[Telemetry Guide](docs/telemetry-guide.md)** - Enhanced build metrics and monitoring
+
+### Migration & Troubleshooting
 - **[Migration Guide](docs/migration-guide.md)** - Migrating from single-arch to multi-arch builds
 - **[Troubleshooting Guide](docs/troubleshooting-guide.md)** - Common issues and solutions
+
+### Development
+- **[Project Structure](docs/project-structure.md)** - Codebase organization
+- **[Contributing](CONTRIBUTING.md)** - Contribution guidelines
 
 ## Action Inputs
 

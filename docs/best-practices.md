@@ -12,12 +12,17 @@ This document provides best practices for using the Debian Multi-Architecture Pa
 
 ## Performance
 
-*   **Adjust `max-parallel`:** The `max-parallel` input controls the number of parallel architecture builds. The optimal value for this input depends on the resources of your runner. For GitHub-hosted runners, the recommended value is `2`. For self-hosted runners with more CPU cores, you can increase this value to `4` or even higher.
+*   **Adjust `max-parallel`:** The `max-parallel` input controls the number of parallel architecture builds. The optimal value depends on your runner resources:
+  - GitHub Actions standard runners: `max-parallel: 2` (2 CPU cores, 7GB RAM)
+  - Self-hosted runners with 4+ cores: `max-parallel: 4`
+  - High-performance runners: `max-parallel: 6-8` (monitor resource usage)
+  
+   For detailed performance optimization information, see **[Performance Tuning](performance-tuning.md)** and **[CHANGELOG](../CHANGELOG.md)**.
 
-*   **Use a Cache:** The action automatically caches the downloaded release artifacts. However, you can also use a separate caching mechanism to cache the Docker images. This can further speed up the build process.
-
-## Security
-
+# Cache Management:
+  - **Download Cache**
+  - **API Cache**
+  - **Docker Cache**
 *   **Verify Checksums:** The action automatically verifies the checksums of the downloaded release artifacts. However, you should also manually verify the checksums of the generated `.deb` packages before distributing them.
 
 *   **Use a Specific Version:** Instead of using a floating version like `v1`, use a specific version of the action in your workflow. This will ensure that your workflow is not affected by any breaking changes in the action.
