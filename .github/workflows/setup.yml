@@ -1,0 +1,94 @@
+# Setup Wizard Workflow
+#
+# This workflow runs the interactive setup wizard to generate
+# a configuration file for your project.
+#
+# To use:
+# 1. Copy to your repo: .github/workflows/setup.yml
+# 2. Run the workflow
+# 3. Download the generated config from artifacts
+# 4. Commit the config to your repo
+# 5. Use it in your build workflow
+
+name: Setup Wizard - Generate Config
+
+on:
+  workflow_dispatch:
+    inputs:
+      github_repo:
+        description: 'GitHub repository (owner/repo)'
+        required: true
+        default: 'eza-community/eza'
+      version:
+        description: 'Version to detect (for pattern analysis)'
+        required: true
+        default: 'v0.23.4'
+
+jobs:
+  setup:
+    name: Generate Configuration
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Setup Wizard
+        run: |
+          # Clone the builder
+          git clone https://github.com/ranjithrajv/debian-multiarch-builder.git /tmp/builder
+          cd /tmp/builder
+          
+          # Run setup wizard (non-interactive mode)
+          ./build.sh --setup << EOF
+y
+${{ github.event.inputs.github_repo }}
+y
+${{ github.event.inputs.version }}
+y
+.github/build-config.yaml
+y
+EOF
+          
+          # Copy generated config to working directory
+          cp /tmp/builder/.github/build-config.yaml $GITHUB_WORKSPACE/ || true
+          
+      - name: Upload Generated Config
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-config
+          path: "build-config.yaml"
+          retention-days: 7
+
+      - name: Display Instructions
+        run: |
+          echo "## Setup Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "A configuration file has been generated for ${{ github.event.inputs.github_repo }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "1. Download the config from the artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "2. Commit it to your repository" >> $GITHUB_STEP_SUMMARY
+          echo "3. Create a build workflow using this config" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Example Build Workflow:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```yaml' >> $GITHUB_STEP_SUMMARY
+          echo "name: Build Package" >> $GITHUB_STEP_SUMMARY
+          echo "on:" >> $GITHUB_STEP_SUMMARY
+          echo "  workflow_dispatch:" >> $GITHUB_STEP_SUMMARY
+          echo "    inputs:" >> $GITHUB_STEP_SUMMARY
+          echo "      version:" >> $GITHUB_STEP_SUMMARY
+          echo "        required: true" >> $GITHUB_STEP_SUMMARY
+          echo "jobs:" >> $GITHUB_STEP_SUMMARY
+          echo "  build:" >> $GITHUB_STEP_SUMMARY
+          echo "    runs-on: ubuntu-latest" >> $GITHUB_STEP_SUMMARY
+          echo "    steps:" >> $GITHUB_STEP_SUMMARY
+          echo "      - uses: actions/checkout@v4" >> $GITHUB_STEP_SUMMARY
+          echo "      - uses: ranjithrajv/debian-multiarch-builder@v1" >> $GITHUB_STEP_SUMMARY
+          echo "        with:" >> $GITHUB_STEP_SUMMARY
+          echo "          config-file: build-config.yaml" >> $GITHUB_STEP_SUMMARY
+          echo "          version: \${{ github.event.inputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "          build-version: '1'" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

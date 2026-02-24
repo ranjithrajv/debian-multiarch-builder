@@ -1,0 +1,60 @@
+# Demo Workflow - Try debian-multiarch-builder
+# 
+# This workflow demonstrates how to use debian-multiarch-builder
+# to build the 'eza' package (a modern ls replacement).
+#
+# To use this workflow:
+# 1. Copy this file to your repository: .github/workflows/demo.yml
+# 2. Go to Actions tab and run the workflow manually
+# 3. Download the built .deb packages from workflow artifacts
+#
+# For more examples, see: https://github.com/ranjithrajv/debian-multiarch-builder
+
+name: Demo - Build Eza Package
+
+on:
+  workflow_dispatch:  # Allows manual triggering
+    inputs:
+      version:
+        description: 'Eza version to build'
+        required: true
+        default: 'v0.23.4'
+      build_version:
+        description: 'Debian build version'
+        required: true
+        default: '1'
+
+jobs:
+  demo:
+    name: Build Demo Package
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Eza Debian Package
+        uses: ranjithrajv/debian-multiarch-builder@v1
+        with:
+          config-file: .github/demo-config.yaml
+          version: ${{ github.event.inputs.version }}
+          build-version: ${{ github.event.inputs.build_version }}
+          max-parallel: 2
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: eza-debian-packages
+          path: "*.deb"
+          retention-days: 30
+
+      - name: Display Build Summary
+        if: always()
+        run: |
+          echo "## Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f build-summary.json ]; then
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            cat build-summary.json >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi

@@ -1,0 +1,55 @@
+# Try It Workflow - Zero-Config Build
+#
+# This workflow shows how to use zero-config mode to build
+# any GitHub project without creating a configuration file.
+#
+# To use:
+# 1. Copy to your repo: .github/workflows/try-it.yml
+# 2. Modify the GITHUB_REPO and VERSION inputs
+# 3. Run the workflow
+#
+# Note: Zero-config works best for projects that publish
+# pre-built Linux binaries with standard naming patterns.
+
+name: Try It - Zero-Config Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      github_repo:
+        description: 'GitHub repository (owner/repo)'
+        required: true
+        default: 'eza-community/eza'
+      version:
+        description: 'Version to build'
+        required: true
+        default: 'v0.23.4'
+      build_version:
+        description: 'Debian build version'
+        required: true
+        default: '1'
+
+jobs:
+  zero-config-build:
+    name: Zero-Config Build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build with Zero-Config
+        run: |
+          # Clone the builder
+          git clone https://github.com/ranjithrajv/debian-multiarch-builder.git /tmp/builder
+          cd /tmp/builder
+          
+          # Run zero-config build
+          ./build.sh --zc ${{ github.event.inputs.github_repo }} ${{ github.event.inputs.version }} ${{ github.event.inputs.build_version }}
+          
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian-packages
+          path: "*.deb"
+          retention-days: 7

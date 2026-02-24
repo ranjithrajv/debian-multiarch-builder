@@ -1,0 +1,25 @@
+# Demo Configuration for Eza Package
+# This configuration is used by the demo workflow
+#
+# Eza: A modern replacement for ls
+# GitHub: https://github.com/eza-community/eza
+
+package_name: "eza"
+github_repo: "eza-community/eza"
+summary: "A modern replacement for ls"
+license: "MIT"
+
+# Download pattern with placeholders
+# {version} - replaced with actual version (e.g., v0.23.4)
+# {arch} - replaced with architecture name from architecture_map
+download_pattern: "eza_v{version}_{arch}-unknown-linux-gnu.tar.gz"
+
+# Map Debian architecture names to release artifact names
+architecture_map:
+  amd64: "x86_64"
+  arm64: "aarch64"
+  armhf: "armv7"
+
+# Optional: Enable parallel builds for faster execution
+parallel_builds: true
+max_parallel: 2
