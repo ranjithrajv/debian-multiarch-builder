@@ -2,6 +2,27 @@
 
 # Build summary generation functions
 
+# Generate viral badge markdown
+generate_viral_badge() {
+    local success_rate="${1:-100}"
+    local build_time="${2:-0}"
+    
+    cat << EOF
+
+---
+🚀 Built with **debian-multiarch-builder**
+[![Built with debian-multiarch-builder](https://img.shields.io/badge/built%20with-debian--multiarch--builder-blue?logo=github)](https://github.com/ranjithrajv/debian-multiarch-builder)
+
+**Build Stats:**
+- ⚡ Success Rate: ${success_rate}%
+- ⏱️  Build Time: ${build_time}s
+- 📦 Packages: ${TOTAL_PACKAGES}
+- 🏗️  Architectures: $(echo "$ARCHITECTURES" | wc -w | tr -d ' ')
+
+→ Try it free: \`./build.sh --setup\` or \`./build.sh --zc owner/repo version 1\`
+EOF
+}
+
 # Function to generate build summary JSON
 generate_build_summary() {
     local build_end_time=$(date +%s)
@@ -45,6 +66,23 @@ generate_build_summary() {
     # Get telemetry summary if available
     local telemetry_json=$(get_telemetry_summary 2>/dev/null || echo "{}")
 
+    # Calculate success rate for badge
+    local attempted_packages=0
+    for arch in $(cat /tmp/attempted_architectures.txt 2>/dev/null); do
+        local supported_count=0
+        for dist in "bookworm" "trixie" "forky" "sid"; do
+            if is_arch_supported_for_dist "$arch" "$dist" 2>/dev/null; then
+                supported_count=$((supported_count + 1))
+            fi
+        done
+        attempted_packages=$((attempted_packages + supported_count))
+    done
+    
+    local success_rate=0
+    if [ "$attempted_packages" -gt 0 ]; then
+        success_rate=$(( (TOTAL_PACKAGES * 100) / attempted_packages ))
+    fi
+
     # Generate build summary JSON
     cat > build-summary.json <<EOF
 {
@@ -65,10 +103,15 @@ generate_build_summary() {
   "max_parallel": $MAX_PARALLEL,
   "packages": $packages_json,
   "lintian": $lintian_json,
-  "telemetry": $telemetry_json
+  "telemetry": $telemetry_json,
+  "success_rate": $success_rate
 }
 EOF
 
     success "Build summary saved to build-summary.json"
     echo "   📦 Total artifact size: $size_human ($TOTAL_PACKAGES packages)"
+    
+    # Generate and display viral badge
+    echo ""
+    generate_viral_badge "$success_rate" "$build_duration"
 }

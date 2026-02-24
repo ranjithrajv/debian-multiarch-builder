@@ -54,21 +54,24 @@ architecture_support:
     - armhf
     - ppc64el
     - s390x
+    - riscv64
+    - loong64
 
   # Distribution-restricted architectures
   restricted:
     i386:
       distributions:
         - bookworm
-      reason: "Deprecated in Trixie (v13+)"
-      eol_date: "2026-06"
+        - trixie
+      reason: "Reduced support in Trixie v13+ (partial userland only)"
+      note: "Full installation support only in Bookworm, partial userland in Trixie+"
 
     armel:
       distributions:
         - bookworm
-      reason: "Last version in Bookworm as regular architecture"
-      eol_date: "2026-06"
-      note: "May be available as ports architecture in Trixie+"
+        - trixie
+      reason: "Limited security support in Trixie v13+ (glibc maintenance issues)"
+      note: "Security fixes may be delayed due to limited maintainer support"
 
     riscv64:
       distributions:
@@ -77,6 +80,13 @@ architecture_support:
         - sid
       reason: "Introduced in Trixie (v13)"
       note: "Not available in Bookworm"
+
+    loong64:
+      distributions:
+        - forky
+        - sid
+      reason: "Introduced in Forky (v14)"
+      note: "Not available in Bookworm or Trixie"
 
 # Architecture naming patterns for auto-discovery
 # Maps Debian architectures to common upstream naming conventions
@@ -90,6 +100,7 @@ arch_patterns:
   ppc64el: "powerpc64le|ppc64le"
   s390x: "s390x"
   riscv64: "riscv64gc|riscv64"
+  loong64: "loongarch64|loong64"
 
 # Supported artifact formats
 # These are the archive formats the builder can extract

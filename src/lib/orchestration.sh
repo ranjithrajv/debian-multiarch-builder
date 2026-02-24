@@ -81,9 +81,12 @@ build_all_architectures_parallel() {
     # Apply enhanced resource pooling based on current system resources
     source "$SCRIPT_DIR/resource-pool.sh"
     
+    # Source progress visualization
+    source "$SCRIPT_DIR/progress.sh" 2>/dev/null || true
+
     local current_memory_mb=$(free -m 2>/dev/null | awk '/^Mem:/{print $7}' || echo "2048")
     local current_cores=$(nproc 2>/dev/null || echo "2")
-    
+
     # Initialize resource pool with enhanced degradation
     init_resource_pool "$MAX_PARALLEL" "$current_memory_mb" "$current_cores"
     local adjusted_parallel=$(apply_enhanced_degradation "$MAX_PARALLEL")
@@ -91,6 +94,9 @@ build_all_architectures_parallel() {
     echo "⚡ Parallel builds enabled (max: $adjusted_parallel concurrent, enhanced resource pooling)"
     get_resource_stats
     echo ""
+
+    # Initialize progress tracking
+    init_progress_tracking "$total_archs" "$VERSION" "$PACKAGE_NAME" 2>/dev/null || true
 
     # Use job control for more efficient process management
     local arch_index=0
@@ -120,6 +126,9 @@ build_all_architectures_parallel() {
             fi
 
             echo "🔨 Starting build for $next_arch ($((arch_index+1))/$total_archs)..."
+            
+            # Update progress tracking
+            update_arch_status "$next_arch" "running" "Build started" 2>/dev/null || true
 
             # Start build with resource tracking
             build_architecture_parallel "$next_arch" "$job_id" &
@@ -140,6 +149,11 @@ build_all_architectures_parallel() {
             local avail_jobs=$(echo "$availability" | cut -d: -f3)
 
             echo "   ⚡ Resources: ${avail_mem}MB RAM, ${avail_cores} cores, ${avail_jobs} slots available"
+            
+            # Display progress dashboard if terminal supports it
+            if [ -t 1 ]; then
+                display_progress_dashboard 2>/dev/null || true
+            fi
         fi
     }
 
@@ -198,11 +212,13 @@ build_all_architectures_parallel() {
                         local duration=$(cat "build_${arch}.time")
                         duration_str=" ($(format_duration $duration))"
                     fi
-                    
+
                     completed_count=$((completed_count + 1))
-                    
+
                     if [ $exit_code -eq 0 ]; then
                         echo "✅ Completed build for $arch$duration_str [$completed_count/$total_archs]"
+                        # Update progress tracking
+                        update_arch_status "$arch" "completed" "Success${duration_str}" 2>/dev/null || true
                     else
                         echo "⚠️  Build for $arch completed with errors$duration_str [$completed_count/$total_archs]"
                         echo "   💡 Architecture $arch will be skipped - other architectures will continue"
@@ -213,12 +229,14 @@ build_all_architectures_parallel() {
                             echo "   🔍 Full log available in build_${arch}.log"
                             echo ""
                         fi
+                        # Update progress tracking
+                        update_arch_status "$arch" "failed" "Build failed${duration_str}" 2>/dev/null || true
                     fi
-                    
+
                     # Release resources and cleanup
                     if [ -n "$job_id" ]; then
                         release_resources "$job_id"
-                        
+
                         # Kill monitor process if still running
                         if [ -f "${RESOURCE_POOL_STATE_DIR}/${job_id}_pids" ]; then
                             local pids=$(cat "${RESOURCE_POOL_STATE_DIR}/${job_id}_pids")
@@ -228,6 +246,11 @@ build_all_architectures_parallel() {
                             fi
                             rm -f "${RESOURCE_POOL_STATE_DIR}/${job_id}_pids"
                         fi
+                    fi
+                    
+                    # Display updated progress
+                    if [ -t 1 ]; then
+                        display_progress_dashboard 2>/dev/null || true
                     fi
                 fi
                 
@@ -254,6 +277,9 @@ build_all_architectures_parallel() {
             rm -f "build_${arch}.status" "build_${arch}.log" "build_${arch}.time"
         fi
     done
+
+    # Cleanup progress tracking
+    cleanup_progress_tracking 2>/dev/null || true
 
     if [ "$failed" = "true" ]; then
         echo ""

@@ -1,21 +1,6 @@
 #!/bin/bash
 
-# Configuration parsing and validation functions
-
-# Source YAML utilities for loading externalized configuration
-source "$SCRIPT_DIR/data/yaml-utils.sh"
-
-# Load architecture support data
-load_architecture_support
-
-# Parse and validate configuration
-parse_config() {
-    local config_file=$1
-    local config_dir=$(dirname "$config_file")
-
-    # Initialize CI environment detection first
-    source "$SCRIPT_DIR/ci-optimization.sh"
-    init_ci_optimization
+# Configuration parsing and validation
 
     # New split configuration: package.yaml + optional overrides.yaml
     local package_file="$config_file"
@@ -25,17 +10,17 @@ parse_config() {
 
     # Check if package file exists
     if [ ! -f "$package_file" ]; then
-        error "Configuration file not found: $package_file"
+        error "Configuration file not found: $package_file" "config_not_found"
     fi
 
     # Check if yq is installed
     if ! command -v yq &> /dev/null; then
-        error "yq is not installed. Please install yq: https://github.com/mikefarah/yq"
+        error "yq is not installed. Please install yq: https://github.com/mikefarah/yq" "yq_not_installed"
     fi
 
     # Validate YAML syntax for package file
     if ! yq eval '.' "$package_file" &> /dev/null; then
-        error "Invalid YAML syntax in $package_file"
+        error "Invalid YAML syntax in $package_file" "invalid_yaml" "$package_file"
     fi
 
     # Validate YAML syntax for overrides file if it exists
@@ -49,7 +34,21 @@ parse_config() {
     # Parse package configuration
     PACKAGE_NAME=$(yq eval '.package_name' "$package_file")
     GITHUB_REPO=$(yq eval '.github_repo' "$package_file")
-    ARTIFACT_FORMAT=$(yq eval '.artifact_format // "tar.gz"' "$package_file")
+    
+    # Check if artifact_format is explicitly defined in the config
+    local config_artifact_format=$(yq eval '.artifact_format' "$package_file")
+    if [ "$config_artifact_format" = "null" ] || [ -z "$config_artifact_format" ]; then
+        # Default to "tar.gz" initially; we'll try to auto-detect later after all libraries are loaded
+        ARTIFACT_FORMAT="tar.gz"
+        # Mark that auto-detection is needed (to be done later after all functions are available)
+        ARTIFACT_FORMAT_AUTO_DETECT_NEEDED="true"
+        info "No artifact_format specified in config, will attempt auto-detection after initialization"
+    else
+        # Use the explicitly provided format
+        ARTIFACT_FORMAT="$config_artifact_format"
+        info "Using explicit artifact_format from config: $ARTIFACT_FORMAT"
+    fi
+    
     BINARY_PATH=$(yq eval '.binary_path // ""' "$package_file")
 
     # Parse parallel builds settings from overrides or package file

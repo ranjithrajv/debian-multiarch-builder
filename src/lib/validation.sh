@@ -47,11 +47,16 @@ verify_checksum() {
         return 0
     fi
 
-    # Download checksum file
+    # Download checksum file with caching
     local checksum_url="https://github.com/${GITHUB_REPO}/releases/download/${VERSION}/${checksum_file}"
     info "Found checksum file: $checksum_file"
+    
+    # Source download cache library if not already loaded
+    if ! command -v download_with_cache >/dev/null 2>&1; then
+        source "$SCRIPT_DIR/download-cache.sh"
+    fi
 
-    if ! wget -q "$checksum_url" 2>&1; then
+    if ! download_with_cache "$checksum_url" "$checksum_file"; then
         warning "Failed to download checksum file, skipping verification"
         return 0
     fi
@@ -88,5 +93,67 @@ Expected: $expected_checksum
 Actual:   $actual_checksum
 
 The downloaded file may be corrupted or tampered with."
+    fi
+}
+
+# Function to fetch checksum for a specific asset (used by download cache)
+fetch_checksum_for_asset() {
+    local asset_name="$1"
+    local assets=$(fetch_release_assets)
+    
+    # Try to find checksum file in release assets
+    local checksum_patterns=("${asset_name}.sha256" "${asset_name}.sha256sum" "SHA256SUMS" "checksums.txt")
+    local checksum_file=""
+    
+    for pattern in "${checksum_patterns[@]}"; do
+        if echo "$assets" | grep -qi "^${pattern}$"; then
+            checksum_file="$pattern"
+            break
+        fi
+    done
+    
+    if [ -z "$checksum_file" ]; then
+        return 1
+    fi
+    
+    # Download checksum file
+    local checksum_url="https://github.com/${GITHUB_REPO}/releases/download/${VERSION}/${checksum_file}"
+    
+    # Source download cache library if not already loaded
+    if ! command -v download_with_cache >/dev/null 2>&1; then
+        source "$SCRIPT_DIR/download-cache.sh"
+    fi
+    
+    if ! download_with_cache "$checksum_url" "$checksum_file"; then
+        return 1
+    fi
+    
+    # Extract checksum for our specific asset
+    local expected_checksum=""
+    
+    # Try different checksum formats
+    if [ -f "$checksum_file" ]; then
+        # SHA256 format: "hash  filename"
+        expected_checksum=$(grep -F "$asset_name" "$checksum_file" 2>/dev/null | awk '{print $1}' | head -1)
+        
+        # If not found, try other formats
+        if [ -z "$expected_checksum" ]; then
+            # Format: "hash *filename" (common in GNU coreutils)
+            expected_checksum=$(grep -F "$asset_name" "$checksum_file" 2>/dev/null | awk '{print $1}' | head -1)
+        fi
+        
+        if [ -z "$expected_checksum" ]; then
+            # Format: "hash:filename" or "hash filename" (case insensitive)
+            expected_checksum=$(grep -iF "$asset_name" "$checksum_file" 2>/dev/null | awk -F'[:[:space:]]' '{print $1}' | head -1)
+        fi
+        
+        rm -f "$checksum_file"
+    fi
+    
+    if [ -n "$expected_checksum" ]; then
+        echo "$expected_checksum"
+        return 0
+    else
+        return 1
     fi
 }

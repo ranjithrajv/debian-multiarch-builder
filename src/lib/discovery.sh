@@ -8,6 +8,27 @@ source "$SCRIPT_DIR/data/yaml-utils.sh"
 # Load architecture patterns data
 load_architecture_patterns
 
+# Function to auto-detect artifact format from release pattern
+detect_artifact_format() {
+    local release_pattern=$1
+    
+    # Extract the file extension from the release pattern
+    if [[ "$release_pattern" =~ \.zip$ ]]; then
+        echo "zip"
+        return 0
+    elif [[ "$release_pattern" =~ \.tar\.gz$ ]]; then
+        echo "tar.gz"
+        return 0
+    elif [[ "$release_pattern" =~ \.tgz$ ]]; then
+        echo "tgz"
+        return 0
+    else
+        # If no recognized extension found, return default
+        echo "tar.gz"
+        return 1
+    fi
+}
+
 # Function to auto-discover release pattern for an architecture
 auto_discover_pattern() {
     local arch=$1
@@ -21,8 +42,9 @@ auto_discover_pattern() {
     local assets=$(fetch_release_assets)
 
     # Filter assets by format and pattern, filter out checksums and source
+    # Use default format for initial filtering
     local filtered_assets=$(echo "$assets" | \
-        grep -E "\.(${ARTIFACT_FORMAT}|tgz|tar\.gz|zip)$" | \
+        grep -E "\\.(${ARTIFACT_FORMAT:-tar.gz}|tgz|tar\\.gz|zip)$" | \
         grep -v -i "sha256\|checksum\|source" | \
         grep -iE "$pattern" | \
         grep -i "linux")
@@ -67,12 +89,12 @@ get_release_pattern() {
         fi
 
         # Validate pattern has {version} placeholder
-        if [[ ! "$pattern" =~ \{version\} ]]; then
+        if [[ ! "$pattern" =~ \\{version\\} ]]; then
             warning "Release pattern for $arch doesn't contain {version} placeholder: $pattern"
         fi
 
         # Replace {version} placeholder with actual version
-        pattern="${pattern//\{version\}/$VERSION}"
+        pattern="${pattern//\\{version\\}/$VERSION}"
         echo "$pattern"
         return 0
     fi
