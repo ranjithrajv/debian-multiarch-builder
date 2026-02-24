@@ -9,16 +9,15 @@ github_repo: "eza-community/eza"
 summary: "A modern replacement for ls"
 license: "MIT"
 
-# Download pattern with placeholders
-# {version} - replaced with actual version (e.g., v0.23.4)
-# {arch} - replaced with architecture name from architecture_map
-download_pattern: "eza_v{version}_{arch}-unknown-linux-gnu.tar.gz"
-
-# Map Debian architecture names to release artifact names
-architecture_map:
-  amd64: "x86_64"
-  arm64: "aarch64"
-  armhf: "armv7"
+# Architecture-specific release patterns
+# {version} is replaced with the actual version at build time
+architectures:
+  amd64:
+    release_pattern: "eza_v{version}_x86_64-unknown-linux-gnu.tar.gz"
+  arm64:
+    release_pattern: "eza_v{version}_aarch64-unknown-linux-gnu.tar.gz"
+  armhf:
+    release_pattern: "eza_v{version}_armv7-unknown-linux-gnu.tar.gz"
 
 # Optional: Enable parallel builds for faster execution
 parallel_builds: true

@@ -53,7 +53,7 @@ verify_checksum() {
     
     # Source download cache library if not already loaded
     if ! command -v download_with_cache >/dev/null 2>&1; then
-        source "$SCRIPT_DIR/download-cache.sh"
+        source "$SCRIPT_DIR/lib/download-cache.sh"
     fi
 
     if ! download_with_cache "$checksum_url" "$checksum_file"; then
@@ -121,7 +121,7 @@ fetch_checksum_for_asset() {
     
     # Source download cache library if not already loaded
     if ! command -v download_with_cache >/dev/null 2>&1; then
-        source "$SCRIPT_DIR/download-cache.sh"
+        source "$SCRIPT_DIR/lib/download-cache.sh"
     fi
     
     if ! download_with_cache "$checksum_url" "$checksum_file"; then

@@ -3,11 +3,10 @@
 # Auto-Discovery Mode - Automatic configuration generation
 # Allows building without a configuration file by auto-detecting from GitHub repo
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LIB_DIR="$(dirname "$SCRIPT_DIR")/lib"
+_ZC_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source required libraries
-source "$LIB_DIR/logging.sh"
+source "$_ZC_LIB_DIR/logging.sh"
 
 # Auto-detect GitHub repo from current directory
 detect_github_repo() {

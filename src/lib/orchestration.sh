@@ -79,10 +79,10 @@ build_all_architectures_parallel() {
     local total_archs=${#arch_array[@]}
 
     # Apply enhanced resource pooling based on current system resources
-    source "$SCRIPT_DIR/resource-pool.sh"
-    
+    source "$SCRIPT_DIR/lib/resource-pool.sh"
+
     # Source progress visualization
-    source "$SCRIPT_DIR/progress.sh" 2>/dev/null || true
+    source "$SCRIPT_DIR/lib/progress.sh" 2>/dev/null || true
 
     local current_memory_mb=$(free -m 2>/dev/null | awk '/^Mem:/{print $7}' || echo "2048")
     local current_cores=$(nproc 2>/dev/null || echo "2")

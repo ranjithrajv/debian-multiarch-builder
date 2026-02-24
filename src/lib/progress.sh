@@ -3,8 +3,6 @@
 # Build progress visualization
 # Provides real-time progress tracking and visual status updates
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
 # Color codes
 RED='\033[0;31m'
 GREEN='\033[0;32m'

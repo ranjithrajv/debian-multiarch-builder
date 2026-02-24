@@ -38,6 +38,12 @@ RUN if [ -f /tmp/package-files/README.md ]; then \
         cp /tmp/package-files/README.md /output/usr/share/doc/${PACKAGE_NAME}/; \
     fi
 
+# Replace placeholders in changelog (must be done BEFORE gzip)
+RUN sed -i "s/PACKAGE_NAME/${PACKAGE_NAME}/g" /output/usr/share/doc/${PACKAGE_NAME}/changelog.Debian
+RUN sed -i "s/DIST/${DEBIAN_DIST}/g" /output/usr/share/doc/${PACKAGE_NAME}/changelog.Debian
+RUN sed -i "s/FULL_VERSION/${FULL_VERSION}/g" /output/usr/share/doc/${PACKAGE_NAME}/changelog.Debian
+RUN sed -i "s/VERSION/${VERSION}/g" /output/usr/share/doc/${PACKAGE_NAME}/changelog.Debian
+
 # Compress changelog
 RUN gzip -9 /output/usr/share/doc/${PACKAGE_NAME}/changelog.Debian
 
@@ -48,12 +54,6 @@ RUN sed -i "s/BUILD_VERSION/${BUILD_VERSION}/g" /output/DEBIAN/control
 RUN sed -i "s/VERSION/${VERSION}/g" /output/DEBIAN/control
 RUN sed -i "s/SUPPORTED_ARCHITECTURES/${ARCH}/g" /output/DEBIAN/control
 RUN sed -i "s|GITHUB_REPO|${GITHUB_REPO}|g" /output/DEBIAN/control
-
-# Replace placeholders in changelog
-RUN sed -i "s/PACKAGE_NAME/${PACKAGE_NAME}/g" /output/usr/share/doc/${PACKAGE_NAME}/changelog.Debian.gz
-RUN sed -i "s/DIST/${DEBIAN_DIST}/g" /output/usr/share/doc/${PACKAGE_NAME}/changelog.Debian.gz
-RUN sed -i "s/FULL_VERSION/${FULL_VERSION}/g" /output/usr/share/doc/${PACKAGE_NAME}/changelog.Debian.gz
-RUN sed -i "s/VERSION/${VERSION}/g" /output/usr/share/doc/${PACKAGE_NAME}/changelog.Debian.gz
 
 # Build the .deb package
 RUN dpkg-deb --build /output /${PACKAGE_NAME}_${FULL_VERSION}.deb

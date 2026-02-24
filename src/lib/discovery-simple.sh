@@ -87,6 +87,6 @@ detect_artifact_format() {
 # Fetch release assets - use centralized function
 fetch_release_assets() {
     # Source the github-api library to use the centralized function
-    source "$SCRIPT_DIR/github-api.sh"
+    source "$SCRIPT_DIR/lib/github-api.sh"
     fetch_release_assets "$@"
 }

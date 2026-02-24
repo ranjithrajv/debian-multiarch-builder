@@ -3,11 +3,10 @@
 # Dry-run mode for instant validation
 # Provides configuration validation and release availability checking without building
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LIB_DIR="$(dirname "$SCRIPT_DIR")/lib"
+_DR_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source required libraries
-source "$LIB_DIR/logging.sh"
+source "$_DR_LIB_DIR/logging.sh"
 
 # Dry run validation function
 run_dry_run() {

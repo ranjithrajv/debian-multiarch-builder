@@ -179,7 +179,7 @@ Please check:
     fi
     
     # Source download cache library
-    source "$SCRIPT_DIR/download-cache.sh"
+    source "$SCRIPT_DIR/lib/download-cache.sh"
     
     # Download with caching
     if ! download_release_asset "$release_pattern" "$archive_name" "$expected_checksum"; then
