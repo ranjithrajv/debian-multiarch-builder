@@ -24,6 +24,9 @@ build_architecture_parallel() {
     local log_file="build_${build_arch}.log"
     local start_time=$(date +%s)
 
+    # Ensure status file is always written even if error() calls exit 1 deep inside build_architecture
+    trap "[ ! -f \"build_${build_arch}.status\" ] && echo 'FAILED' > \"build_${build_arch}.status\"" EXIT
+
     # Record telemetry for this architecture build
     record_build_stage "architecture_${build_arch}"
 
