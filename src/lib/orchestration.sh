@@ -78,102 +78,185 @@ build_all_architectures_parallel() {
     local arch_array=("$@")
     local total_archs=${#arch_array[@]}
 
-    # Apply graceful degradation based on current system resources
-    source "$SCRIPT_DIR/ci-optimization.sh"
-
+    # Apply enhanced resource pooling based on current system resources
+    source "$SCRIPT_DIR/resource-pool.sh"
+    
     local current_memory_mb=$(free -m 2>/dev/null | awk '/^Mem:/{print $7}' || echo "2048")
     local current_cores=$(nproc 2>/dev/null || echo "2")
-    local adjusted_parallel=$(apply_graceful_degradation "$MAX_PARALLEL" "$current_memory_mb" "$current_cores")
+    
+    # Initialize resource pool with enhanced degradation
+    init_resource_pool "$MAX_PARALLEL" "$current_memory_mb" "$current_cores"
+    local adjusted_parallel=$(apply_enhanced_degradation "$MAX_PARALLEL")
 
-    if [ "$adjusted_parallel" -ne "$MAX_PARALLEL" ]; then
-        info "Resource-aware adjustment: Using $adjusted_parallel parallel jobs (was $MAX_PARALLEL)"
-        MAX_PARALLEL=$adjusted_parallel
-    fi
-
-    echo "⚡ Parallel builds enabled (max: $MAX_PARALLEL concurrent, resource-aware)"
+    echo "⚡ Parallel builds enabled (max: $adjusted_parallel concurrent, enhanced resource pooling)"
+    get_resource_stats
     echo ""
 
-    declare -a pids=()
-    declare -a active_archs=()
+    # Use job control for more efficient process management
     local arch_index=0
     local completed_count=0
+    local sleep_duration=0.1
+
+    # Enable job control
+    set -m
+
+    # Function to get currently running jobs
+    get_running_jobs() {
+        jobs -r | wc -l
+    }
+
+    # Function to start next available build with resource pooling
+    start_next_build() {
+        if [ $arch_index -lt $total_archs ]; then
+            local next_arch="${arch_array[$arch_index]}"
+
+            # Try to acquire resources for this build
+            local job_id="build_${next_arch}_$$"
+            local resource_result
+            resource_result=$(acquire_resources "$job_id" 1024 1 2>/dev/null || echo "FAILED")
+
+            if [[ "$resource_result" == "FAILED"* ]]; then
+                # Insufficient resources, skip for now
+                return 1
+            fi
+
+            echo "🔨 Starting build for $next_arch ($((arch_index+1))/$total_archs)..."
+
+            # Start build with resource tracking
+            build_architecture_parallel "$next_arch" "$job_id" &
+            local build_pid=$!
+
+            # Start resource monitoring
+            local monitor_pid=$(monitor_job_resources "$job_id" "$build_pid")
+
+            # Store job and monitor PIDs for cleanup
+            echo "${build_pid}:${monitor_pid}" > "${RESOURCE_POOL_STATE_DIR}/job_${job_id}_pids"
+
+            arch_index=$((arch_index + 1))
+
+            # Show current resource status
+            local availability=$(get_resource_availability)
+            local avail_mem=$(echo "$availability" | cut -d: -f1)
+            local avail_cores=$(echo "$availability" | cut -d: -f2)
+            local avail_jobs=$(echo "$availability" | cut -d: -f3)
+
+            echo "   ⚡ Resources: ${avail_mem}MB RAM, ${avail_cores} cores, ${avail_jobs} slots available"
+        fi
+    }
 
     # Start initial batch of builds
-    for build_arch in "${arch_array[@]}"; do
-        if [ ${#pids[@]} -lt $MAX_PARALLEL ]; then
-            echo "🔨 Starting build for $build_arch (${arch_index}/$total_archs)..."
-            build_architecture_parallel "$build_arch" &
-            pids+=($!)
-            active_archs+=("$build_arch")
-            arch_index=$((arch_index + 1))
-        else
-            break
-        fi
+    while [ $(get_running_jobs) -lt $adjusted_parallel ] && [ $arch_index -lt $total_archs ]; do
+        start_next_build
     done
 
-    # As builds complete, start new ones
-    while [ $arch_index -lt $total_archs ] || [ ${#pids[@]} -gt 0 ]; do
-        # Check for completed builds
-        for i in "${!pids[@]}"; do
-            pid=${pids[$i]}
-            if ! kill -0 $pid 2>/dev/null; then
-                # Build completed - capture exit code before it's lost
-                set +e  # Temporarily disable exit-on-error
-                wait $pid
-                exit_code=$?
-                set -e  # Re-enable exit-on-error
-
-                arch=${active_archs[$i]}
-
-                # Read duration if available
-                local duration_str=""
-                if [ -f "build_${arch}.time" ]; then
-                    local duration=$(cat "build_${arch}.time")
-                    duration_str=" ($(format_duration $duration))"
-                fi
-
-                completed_count=$((completed_count + 1))
-
-                if [ $exit_code -eq 0 ]; then
-                    echo "✅ Completed build for $arch$duration_str [$completed_count/$total_archs]"
-                else
-                    echo "⚠️  Build for $arch completed with errors$duration_str [$completed_count/$total_archs]"
-                    echo "   💡 Architecture $arch will be skipped - other architectures will continue"
-                    # Print log immediately to help with debugging
-                    if [ -f "build_${arch}.log" ]; then
-                        echo "   📋 Error details for $arch:"
-                        cat "build_${arch}.log" | head -10  # Show first 10 lines of errors
-                        echo "   🔍 Full log available in build_${arch}.log"
-                        echo ""
+    # Main build loop with optimized polling
+    while [ $arch_index -lt $total_archs ] || [ $(get_running_jobs) -gt 0 ]; do
+        # Wait for any job to complete with timeout
+        local wait_result=0
+        if [ $(get_running_jobs) -gt 0 ]; then
+            # Use wait -n to wait for next job completion (bash 5.x on GitHub Actions runners)
+            wait -n || wait_result=$?
+        fi
+        
+        # Process completed jobs
+        for job in $(jobs -p); do
+            if ! kill -0 $job 2>/dev/null; then
+                # Job completed, get exit code
+                set +e
+                wait $job
+                local exit_code=$?
+                set -e
+                
+                # Find the architecture and job_id for this completed job
+                local arch=""
+                local job_id=""
+                for status_file in build_*.status; do
+                    if [ -f "$status_file" ]; then
+                        local test_arch=$(basename "$status_file" .status | sed 's/build_//')
+                        if [ -n "$test_arch" ]; then
+                            # Find corresponding job_id
+                            for pid_file in "${RESOURCE_POOL_STATE_DIR}"/job_build_*_pids; do
+                                if [ -f "$pid_file" ]; then
+                                    local pid_file_arch=$(basename "$pid_file" | sed -E 's/job_build_(.+)_([0-9]+)_pids/\1/')
+                                    if [ "$pid_file_arch" = "$test_arch" ]; then
+                                        arch="$test_arch"
+                                        job_id=$(basename "$pid_file" | sed 's/_pids//')
+                                        break
+                                    fi
+                                fi
+                            done
+                            if [ -n "$arch" ]; then
+                                break
+                            fi
+                        fi
+                    fi
+                done
+                
+                if [ -n "$arch" ]; then
+                    # Read duration if available
+                    local duration_str=""
+                    if [ -f "build_${arch}.time" ]; then
+                        local duration=$(cat "build_${arch}.time")
+                        duration_str=" ($(format_duration $duration))"
+                    fi
+                    
+                    completed_count=$((completed_count + 1))
+                    
+                    if [ $exit_code -eq 0 ]; then
+                        echo "✅ Completed build for $arch$duration_str [$completed_count/$total_archs]"
+                    else
+                        echo "⚠️  Build for $arch completed with errors$duration_str [$completed_count/$total_archs]"
+                        echo "   💡 Architecture $arch will be skipped - other architectures will continue"
+                        # Print log immediately to help with debugging
+                        if [ -f "build_${arch}.log" ]; then
+                            echo "   📋 Error details for $arch:"
+                            cat "build_${arch}.log" | head -10  # Show first 10 lines of errors
+                            echo "   🔍 Full log available in build_${arch}.log"
+                            echo ""
+                        fi
+                    fi
+                    
+                    # Release resources and cleanup
+                    if [ -n "$job_id" ]; then
+                        release_resources "$job_id"
+                        
+                        # Kill monitor process if still running
+                        if [ -f "${RESOURCE_POOL_STATE_DIR}/${job_id}_pids" ]; then
+                            local pids=$(cat "${RESOURCE_POOL_STATE_DIR}/${job_id}_pids")
+                            local monitor_pid=$(echo "$pids" | cut -d: -f2)
+                            if [ -n "$monitor_pid" ] && kill -0 "$monitor_pid" 2>/dev/null; then
+                                kill "$monitor_pid" 2>/dev/null || true
+                            fi
+                            rm -f "${RESOURCE_POOL_STATE_DIR}/${job_id}_pids"
+                        fi
                     fi
                 fi
-
-                # Remove from active arrays
-                unset pids[$i]
-                unset active_archs[$i]
-                pids=("${pids[@]}")  # Reindex
-                active_archs=("${active_archs[@]}")
-
+                
                 # Start next build if available
-                if [ $arch_index -lt $total_archs ]; then
-                    next_arch="${arch_array[$arch_index]}"
-                    echo "🔨 Starting build for $next_arch ($((arch_index+1))/$total_archs)..."
-                    build_architecture_parallel "$next_arch" &
-                    pids+=($!)
-                    active_archs+=("$next_arch")
-                    arch_index=$((arch_index + 1))
-
-                    # Show currently running builds
-                    if [ ${#active_archs[@]} -gt 0 ]; then
-                        echo "   ⚡ Running: ${active_archs[*]}"
-                    fi
-                fi
-
+                start_next_build
                 break
             fi
         done
 
-        sleep 1
+        # Implement exponential backoff polling
+        local sleep_duration=0.1
+        local max_sleep=2.0
+        
+        # If no builds are active, sleep longer
+        if [ ${#pids[@]} -eq 0 ]; then
+            sleep_duration=1.0
+        fi
+        
+        sleep $sleep_duration
+        
+        # Gradually increase sleep duration if we're polling frequently
+        if [ "$sleep_duration" -lt "$max_sleep" ]; then
+            sleep_duration=$(echo "$sleep_duration * 1.5" | bc -l 2>/dev/null || echo "1.0")
+            # Cap at max_sleep
+            if [ "$(echo "$sleep_duration > $max_sleep" | bc -l 2>/dev/null || echo "0")" = "1" ]; then
+                sleep_duration=$max_sleep
+            fi
+        fi
     done
 
     # Check for any failures and provide detailed summary
@@ -203,6 +286,7 @@ build_all_architectures_parallel() {
         done
         echo ""
         cleanup_api_cache
+        cleanup_resource_pool
         exit 1
     fi
 }
