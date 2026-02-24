@@ -32,7 +32,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/docker-cache
-          key: docker-${{ matrix.arch }}-${{ hashFiles('src/Dockerfile') }}
+          key: docker-${{ matrix.arch }}-v1
           restore-keys: |
             docker-${{ matrix.arch }}-
 
@@ -49,7 +49,7 @@ jobs:
         if: always()
         with:
           path: /tmp/docker-cache
-          key: docker-${{ matrix.arch }}-${{ hashFiles('src/Dockerfile') }}
+          key: docker-${{ matrix.arch }}-v1
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
