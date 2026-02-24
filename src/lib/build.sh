@@ -85,7 +85,7 @@ build_distribution() {
     local container_name="extract-${PACKAGE_NAME}-${dist}-${build_arch}-$$"
     if ! docker run --name "$container_name" --rm \
         "${PACKAGE_NAME}-${dist}-${build_arch}" \
-        cat "/${PACKAGE_NAME}_${FULL_VERSION}.deb" > "./${PACKAGE_NAME}_${FULL_VERSION}.deb" 2>&1; then
+        cat "/${PACKAGE_NAME}_${FULL_VERSION}.deb" > "./${PACKAGE_NAME}_${FULL_VERSION}.deb" 2>/dev/null; then
         # Fallback to create/copy method if run fails
         id="$(docker create "${PACKAGE_NAME}-${dist}-${build_arch}" 2>/dev/null || echo "")"
         if [ -n "$id" ]; then
@@ -108,6 +108,8 @@ build_distribution() {
 
     # Verify the .deb package was created and is non-empty
     if [ ! -s "./${PACKAGE_NAME}_${FULL_VERSION}.deb" ]; then
+        record_build_failure "package_extraction" "Generated .deb package is missing or empty: ./${PACKAGE_NAME}_${FULL_VERSION}.deb" "1" "$build_arch" "$dist"
+        add_failure_detail "Package file not found or empty after build: ./${PACKAGE_NAME}_${FULL_VERSION}.deb"
         return 1
     fi
 
