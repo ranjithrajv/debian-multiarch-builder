@@ -34,7 +34,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build Eza Debian Package
-        uses: ranjithrajv/debian-multiarch-builder@v1
+        uses: ./  # When copying to your repo, replace with: ranjithrajv/debian-multiarch-builder@v1
         with:
           config-file: .github/demo-config.yaml
           version: ${{ github.event.inputs.version }}

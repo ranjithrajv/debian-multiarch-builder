@@ -39,13 +39,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build with Zero-Config
+        env:
+          GITHUB_REPO: ${{ github.event.inputs.github_repo }}
+          TARGET_VERSION: ${{ github.event.inputs.version }}
+          BUILD_VERSION: ${{ github.event.inputs.build_version }}
         run: |
           # Clone the builder
           git clone https://github.com/ranjithrajv/debian-multiarch-builder.git /tmp/builder
-          cd /tmp/builder
-          
-          # Run zero-config build
-          ./build.sh --zc ${{ github.event.inputs.github_repo }} ${{ github.event.inputs.version }} ${{ github.event.inputs.build_version }}
+
+          # Run zero-config build from workspace so .deb files land here for artifact upload
+          /tmp/builder/build.sh --ad "$GITHUB_REPO" "$TARGET_VERSION" "$BUILD_VERSION"
           
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
