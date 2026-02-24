@@ -95,7 +95,6 @@ build_all_architectures_parallel() {
     # Use job control for more efficient process management
     local arch_index=0
     local completed_count=0
-    local sleep_duration=0.1
 
     # Enable job control
     set -m
