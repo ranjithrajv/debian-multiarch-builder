@@ -2,6 +2,87 @@
 
 A reusable GitHub Action for building Debian packages across multiple architectures from upstream releases. This action simplifies the process of creating multi-architecture Debian packages for projects distributed via GitHub releases.
 
+## 🚀 Quick Start (5-Minute Guide)
+
+Get started in minutes by following these steps. This example shows how to build the [`eza`](https://github.com/eza-community/eza) package.
+
+### 1. Create a Configuration File
+
+First, create a YAML file to tell the action about your package. This file defines where to find the source releases and how to map architectures.
+
+**`examples/quick-start-config.yaml`**
+```yaml
+# Minimal configuration for building the 'eza' package
+# See docs/configuration-reference.md for all options
+
+package_name: "eza"
+github_repo: "eza-community/eza"
+summary: "A modern replacement for ls"
+vendor: "Eza Community"
+license: "MIT"
+
+# Defines how to find release artifacts.
+# The action will replace '{version}' and '{arch}' dynamically.
+download_pattern: "eza_v{version}_{arch}-unknown-linux-gnu.tar.gz"
+
+# Mapping from Debian architecture names to the names used in release artifacts.
+architecture_map:
+  amd64: "x86_64"
+  arm64: "aarch64"
+  armhf: "armv7"
+```
+> [!TIP]
+> This is a minimal configuration. For advanced options like adding dependencies or custom scripts, see the [Configuration Reference](docs/configuration-reference.md).
+
+### 2. Create a GitHub Actions Workflow
+
+Next, create a workflow file in your repository at `.github/workflows/build.yml`. This workflow will trigger the build process.
+
+**`.github/workflows/build.yml`**
+
+> **Performance:** Builds all 9 architectures in parallel — each in its own GitHub Actions runner. Total build time equals the longest single architecture (typically ~8 minutes), not the sum. Docker layer caching reduces re-run times by ~60%.
+
+```yaml
+# Minimal workflow to build the 'eza' package
+# See docs/usage-guide.md for more examples
+
+name: Build Eza Package
+
+on:
+  workflow_dispatch: # Allows you to run this workflow manually
+    inputs:
+      version:
+        description: 'Eza version to build (e.g., 0.18.0)'
+        required: true
+        default: '0.18.0'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Debian Package
+        uses: ranjithrajv/debian-multiarch-builder@v1
+        with:
+          config-file: 'examples/quick-start-config.yaml'
+          version: ${{ github.event.inputs.version }}
+          build-version: '1' # Debian package revision
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: eza-debian-packages
+          path: "*.deb"
+```
+
+### 3. Run the Workflow
+
+That's it! You can now run this workflow from the "Actions" tab of your GitHub repository. It will build the `.deb` packages for the architectures defined in your config and upload them as artifacts.
+
+---
+
 ## Why Use This Action?
 
 *   **Simplify Your Workflow:** Instead of wrestling with complex build scripts, you can build your Debian packages with a single, easy-to-use GitHub Action.
@@ -17,16 +98,18 @@ This action supports multiple Debian distributions and architectures. The table 
 
 | Debian Version | Codename | Status | Supported Architectures |
 |----------------|----------|--------|-------------------------|
-| 12 | bookworm | oldstable | amd64, arm64, armel, armhf, i386, ppc64el, s390x |
-| 13 | trixie | stable | amd64, arm64, armhf, ppc64el, s390x, riscv64 |
+| 12 | bookworm | oldstable | amd64, arm64, armel, armhf, i386, mips64el, mipsel, ppc64el, s390x |
+| 13 | trixie | stable | amd64, arm64, armel, armhf, i386, ppc64el, s390x, riscv64 |
 | 14 | forky | testing | amd64, arm64, armhf, ppc64el, s390x, riscv64, loong64 |
 | unstable | sid | perpetual | amd64, arm64, armhf, ppc64el, s390x, riscv64, loong64 |
 
 **Architecture Notes:**
-- `i386` and `armel` are deprecated in Debian 13 (trixie) and later versions
-- `riscv64` was introduced in Debian 13 (trixie) and is not available in bookworm
-- `loong64` was officially promoted to supported architecture in Debian 14 (forky) and is not available in trixie or bookworm
-- All distributions support the universal architectures: `amd64`, `arm64`, `armhf`, `ppc64el`, and `s390x`
+- `i386`: Full support in bookworm, reduced (partial userland) support in trixie and later
+- `armel`: Full support in bookworm, limited security support in trixie and later
+- `mipsel`, `mips64el`: Supported but deprecated in bookworm and trixie (limited porter support)
+- `riscv64`: Introduced in Debian 13 (trixie), not available in bookworm
+- `loong64`: Introduced in Debian 14 (forky), not available in bookworm or trixie
+- Universal architectures (all distributions): `amd64`, `arm64`, `armhf`, `ppc64el`, `s390x`, `riscv64`, `loong64`
 - `loong64` is the Debian architecture name for LoongArch processors
 
 ## Documentation
