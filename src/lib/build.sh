@@ -12,14 +12,13 @@ build_distribution() {
 
     # Enhanced Docker build with BuildKit optimization and failure capture
     local docker_build_log="/tmp/docker-build-${dist}-${build_arch}.log"
-    local cache_dir="/tmp/docker-cache-${dist}-${build_arch}"
+    local cache_dir="/tmp/docker-cache"
     
     # Enable Docker BuildKit for better performance
     export DOCKER_BUILDKIT=1
     
     # Create cache directory for this build and setup shared cache
     mkdir -p "$cache_dir"
-    mkdir -p "/tmp/docker-cache-shared"
     
     if ! docker build \
         --progress=plain \
@@ -33,7 +32,7 @@ build_distribution() {
         --build-arg ARCH="$build_arch" \
         --build-arg BINARY_SOURCE="$binary_source" \
         --build-arg GITHUB_REPO="$GITHUB_REPO" \
-        --cache-from "type=local,src=/tmp/docker-cache-shared" \
+        --cache-from "type=local,src=${cache_dir}" \
         --cache-to "type=local,dest=${cache_dir},mode=max" \
         . 2>&1 | tee "$docker_build_log"; then
 
