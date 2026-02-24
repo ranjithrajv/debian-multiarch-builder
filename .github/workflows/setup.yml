@@ -40,14 +40,12 @@ jobs:
         run: |
           # Clone the builder
           git clone https://github.com/ranjithrajv/debian-multiarch-builder.git /tmp/builder
-          cd /tmp/builder
 
-          # Run setup wizard (non-interactive mode)
-          printf 'y\n%s\ny\n%s\ny\n.github/build-config.yaml\ny\n' \
-            "$GITHUB_REPO" "$TARGET_VERSION" | ./build.sh --setup
+          # Source libraries and call generate_config directly (no interactive stdin)
+          source /tmp/builder/src/lib/logging.sh
+          source /tmp/builder/src/lib/zero-config.sh
 
-          # Copy generated config to working directory
-          cp /tmp/builder/.github/build-config.yaml $GITHUB_WORKSPACE/ || true
+          generate_config "$GITHUB_REPO" "$TARGET_VERSION" "$GITHUB_WORKSPACE/build-config.yaml"
           
       - name: Upload Generated Config
         uses: actions/upload-artifact@v4
