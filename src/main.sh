@@ -307,8 +307,8 @@ if [ "$ARCH" = "all" ]; then
     info "Detecting available architectures for $PACKAGE_NAME version $VERSION..."
     for arch in "${ARCH_ARRAY[@]}"; do
         # Check if this architecture has release assets available
-        pattern=$(get_release_pattern "$arch" 2>/dev/null)
-        if [ $? -eq 0 ] && [ -n "$pattern" ]; then
+        # Use `if pattern=$(cmd)` form so set -e does not trigger on non-zero exit
+        if pattern=$(get_release_pattern "$arch" 2>/dev/null) && [ -n "$pattern" ]; then
             echo "$arch" >> /tmp/available_architectures.txt
             info "  ✓ $arch: Available"
         else
