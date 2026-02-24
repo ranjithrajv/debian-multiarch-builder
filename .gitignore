@@ -3,15 +3,26 @@
 *.tar.gz
 *.zip
 *.tgz
+build-summary*.json
 
-# Extracted archives
+# Extracted archives / build staging
 *-unknown-linux-*
 *-linux-*
 */bin/
 */usr/
 
-# Docker
+# Backup files
+*.backup
+*.bak
+*.orig
+
+# Telemetry data
+.telemetry/
+
+# Docker cache
 .dockerignore
+docker-cache/
+/tmp/docker-cache/
 
 # OS files
 .DS_Store
@@ -26,6 +37,13 @@ Thumbs.db
 *~
 .editorconfig
 
-# Test files
+# Local config and test files
+test-config.yaml
 test-output/
 test-builds/
+
+# Claude local context
+.claude/
+
+# Logs
+*.log
