@@ -1,0 +1,34 @@
+# Generic Ruby Project Template
+# Copy this as a starting point for Ruby projects
+#
+# Usage:
+#   1. Copy to your config: cp templates/ruby/generic.yaml .github/build-config.yaml
+#   2. Edit package_name, github_repo, and download_pattern
+#   3. Run: ./build.sh .github/build-config.yaml 1.0.0 1
+
+package_name: "my-ruby-app"
+github_repo: "owner/repo"
+summary: "A brief description of your Ruby application"
+vendor: "Your Name or Organization"
+license: "MIT"
+
+# Ruby projects often distribute as gems, but for binary releases:
+download_pattern: "{package_name}-{version}-linux-{arch}.tar.gz"
+
+architecture_map:
+  amd64: "x86_64"
+  arm64: "aarch64"
+  armhf: "armhf"
+
+# Binary path
+binary_path: "bin/{package_name}"
+
+# Ruby runtime dependency
+dependencies:
+  - ruby
+  - ruby-dev
+
+# Optional: Common Ruby dependencies
+# dependencies:
+#   - ruby-bundler
+#   - ruby-rake

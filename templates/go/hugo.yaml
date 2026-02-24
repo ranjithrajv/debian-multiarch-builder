@@ -1,0 +1,26 @@
+# Hugo - Static site generator
+# Template for Go projects
+#
+# Usage:
+#   cp templates/go/hugo.yaml .github/build-config.yaml
+#   ./build.sh .github/build-config.yaml 0.121.0 1
+
+package_name: "hugo"
+github_repo: "gohugoio/hugo"
+summary: "Static site generator written in Go"
+vendor: "Gohugo.io"
+license: "Apache-2.0"
+
+# Hugo uses extended naming convention
+download_pattern: "hugo_extended_{version}_Linux-64bit.tar.gz"
+
+# Hugo provides pre-built binaries with consistent naming
+# No architecture mapping needed for this pattern
+# The pattern is the same for all architectures
+
+# For projects with architecture-specific patterns, use:
+# download_pattern: "hugo_{version}_Linux-{arch}.tar.gz"
+# architecture_map:
+#   amd64: "64bit"
+#   arm64: "ARM64"
+#   armhf: "ARM"

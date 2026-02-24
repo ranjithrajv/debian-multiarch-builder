@@ -1,0 +1,26 @@
+# Bat - A cat(1) clone with wings
+# Template for Rust projects with GitHub releases
+#
+# Usage:
+#   cp templates/rust/bat.yaml .github/build-config.yaml
+#   ./build.sh .github/build-config.yaml 0.24.0 1
+
+package_name: "bat"
+github_repo: "sharkdp/bat"
+summary: "A cat(1) clone with syntax highlighting and Git integration"
+vendor: "David Peter"
+license: "MIT OR Apache-2.0"
+
+download_pattern: "bat-v{version}-{arch}-unknown-linux-gnu.tar.gz"
+
+architecture_map:
+  amd64: "x86_64"
+  arm64: "aarch64"
+  armhf: "armv7"
+  i386: "i686"
+
+# Bat provides musl builds as well - uncomment for static linking
+# download_pattern: "bat-v{version}-{arch}-unknown-linux-musl.tar.gz"
+# architecture_map:
+#   amd64: "x86_64"
+#   arm64: "aarch64"

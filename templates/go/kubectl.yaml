@@ -1,0 +1,25 @@
+# Kubectl - Kubernetes command line tool
+# Template for Go projects
+#
+# Usage:
+#   cp templates/go/kubectl.yaml .github/build-config.yaml
+#   ./build.sh .github/build-config.yaml 1.29.0 1
+
+package_name: "kubectl"
+github_repo: "kubernetes/kubernetes"
+summary: "Command line tool for controlling Kubernetes clusters"
+vendor: "The Kubernetes Authors"
+license: "Apache-2.0"
+
+# Kubectl has a unique download pattern
+# The binary is inside a tarball with version and arch
+download_pattern: "kubernetes-server-linux-{arch}.tar.gz"
+
+architecture_map:
+  amd64: "amd64"
+  arm64: "arm64"
+  armhf: "arm"
+
+# Note: Kubectl tarball contains multiple binaries
+# You may need to extract only the kubectl binary
+# binary_path: "kubernetes/client/bin/kubectl"

@@ -1,0 +1,23 @@
+# Ripgrep - A line-oriented search tool
+# Template for Rust projects
+#
+# Usage:
+#   cp templates/rust/ripgrep.yaml .github/build-config.yaml
+#   ./build.sh .github/build-config.yaml 14.1.0 1
+
+package_name: "ripgrep"
+github_repo: "BurntSushi/ripgrep"
+summary: "A line-oriented search tool that recursively searches directories"
+vendor: "Andrew Gallant"
+license: "Unlicense OR MIT"
+
+download_pattern: "ripgrep-{version}-{arch}-unknown-linux-musl.tar.gz"
+
+architecture_map:
+  amd64: "x86_64"
+  arm64: "aarch64"
+  armhf: "armv7"
+  i386: "i686"
+
+# Ripgrep uses musl for static linking - no glibc dependencies
+# This makes the package more portable

@@ -1,0 +1,41 @@
+# Generic Python Project Template
+# Copy this as a starting point for Python projects
+#
+# Usage:
+#   1. Copy to your config: cp templates/python/generic.yaml .github/build-config.yaml
+#   2. Edit package_name, github_repo, and download_pattern
+#   3. Run: ./build.sh .github/build-config.yaml 1.0.0 1
+
+package_name: "my-python-app"
+github_repo: "owner/repo"
+summary: "A brief description of your Python application"
+vendor: "Your Name or Organization"
+license: "MIT"
+
+# Python projects often use wheel format or standalone binaries
+# For PyO3/Rust-based Python packages:
+download_pattern: "{package_name}-{version}-cp311-cp311-manylinux_2_28_{arch}.whl"
+
+architecture_map:
+  amd64: "x86_64"
+  arm64: "aarch64"
+
+# For standalone binaries (PyInstaller, cx_Freeze):
+# download_pattern: "{package_name}-{version}-linux-{arch}.tar.gz"
+# architecture_map:
+#   amd64: "x86_64"
+#   arm64: "aarch64"
+
+# Binary path
+binary_path: "bin/{package_name}"
+
+# Python runtime dependency
+dependencies:
+  - python3
+  - python3-pip
+
+# Optional: Common Python dependencies
+# dependencies:
+#   - python3-requests
+#   - python3-yaml
+#   - python3-click

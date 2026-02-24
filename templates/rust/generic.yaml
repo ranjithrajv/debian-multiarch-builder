@@ -1,0 +1,35 @@
+# Generic Rust Project Template
+# Copy this as a starting point for any Rust project
+#
+# Usage:
+#   1. Copy to your config: cp templates/rust/generic.yaml .github/build-config.yaml
+#   2. Edit package_name, github_repo, and download_pattern
+#   3. Run: ./build.sh .github/build-config.yaml 1.0.0 1
+
+package_name: "my-rust-app"
+github_repo: "owner/repo"
+summary: "A brief description of your application"
+vendor: "Your Name or Organization"
+license: "MIT OR Apache-2.0"
+
+# Most Rust projects use this pattern
+# Adjust {arch} mapping based on your project's release format
+download_pattern: "{package_name}_v{version}_{arch}-unknown-linux-gnu.tar.gz"
+
+architecture_map:
+  amd64: "x86_64"
+  arm64: "aarch64"
+  # Add more as needed:
+  # armhf: "armv7"
+  # i386: "i686"
+
+# Optional: If your project uses musl (static linking)
+# download_pattern: "{package_name}_v{version}_{arch}-unknown-linux-musl.tar.gz"
+
+# Optional: Binary path if not in archive root
+# binary_path: "my-rust-app"
+
+# Optional: Dependencies
+# dependencies:
+#   - libc6
+#   - libssl3

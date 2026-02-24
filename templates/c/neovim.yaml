@@ -1,0 +1,30 @@
+# Neovim - Vim fork focused on extensibility
+# Template for projects with complex release patterns
+#
+# Usage:
+#   cp templates/c/neovim.yaml .github/build-config.yaml
+#   ./build.sh .github/build-config.yaml 0.9.5 1
+
+package_name: "neovim"
+github_repo: "neovim/neovim"
+summary: "Vim-fork focused on extensibility and usability"
+vendor: "Neovim Authors"
+license: "Apache-2.0"
+
+# Neovim uses consistent naming across architectures
+download_pattern: "nvim-linux-{arch}.tar.gz"
+
+architecture_map:
+  amd64: "x86_64"
+  arm64: "aarch64"
+
+# Binary is in a subdirectory
+binary_path: "nvim-linux-{arch}/bin/nvim"
+
+# Dependencies for neovim
+dependencies:
+  - libncursesw6
+  - libluajit-5.1-2
+  - libunibilium4
+  - libmsgpack-c2
+  - libtree-sitter0.22

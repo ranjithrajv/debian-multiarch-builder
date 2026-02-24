@@ -1,0 +1,36 @@
+# Generic C/C++ Project Template
+# Copy this as a starting point for C/C++ projects
+#
+# Usage:
+#   1. Copy to your config: cp templates/c/generic.yaml .github/build-config.yaml
+#   2. Edit package_name, github_repo, and download_pattern
+#   3. Run: ./build.sh .github/build-config.yaml 1.0.0 1
+
+package_name: "my-cpp-app"
+github_repo: "owner/repo"
+summary: "A brief description of your C/C++ application"
+vendor: "Your Name or Organization"
+license: "GPL-3.0"
+
+# C/C++ projects often have varied naming conventions
+download_pattern: "{package_name}-{version}-linux-{arch}.tar.gz"
+
+architecture_map:
+  amd64: "x86_64"
+  arm64: "aarch64"
+  armhf: "armhf"
+  i386: "i686"
+
+# Binary path (C/C++ projects often have bin/ directory)
+binary_path: "bin/{package_name}"
+
+# Common dependencies for C/C++ applications
+dependencies:
+  - libc6
+  - libstdc++6
+  - libgcc1
+
+# Optional: If your project uses specific library versions
+# dependencies:
+#   - libc6 (>= 2.34)
+#   - libstdc++6 (>= 11)

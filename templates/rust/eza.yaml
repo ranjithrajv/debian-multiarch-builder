@@ -1,0 +1,45 @@
+# Eza - A modern replacement for ls
+# Template for Rust projects using standard release patterns
+# 
+# Usage: 
+#   cp templates/rust/eza.yaml .github/build-config.yaml
+#   ./build.sh .github/build-config.yaml 0.18.0 1
+
+package_name: "eza"
+github_repo: "eza-community/eza"
+summary: "A modern replacement for ls"
+vendor: "Eza Community"
+license: "MIT"
+
+# Download pattern with placeholders
+# {version} - replaced with actual version
+# {arch} - replaced with architecture name from architecture_map
+download_pattern: "eza_v{version}_{arch}-unknown-linux-gnu.tar.gz"
+
+# Map Debian architecture names to release artifact names
+architecture_map:
+  amd64: "x86_64"
+  arm64: "aarch64"
+  armhf: "armv7"
+  # armel: "armv6"  # Uncomment if project supports
+  # i386: "i686"    # Uncomment if project supports
+
+# Optional: Override distributions for specific architectures
+# distribution_arch_overrides:
+#   armhf:
+#     distributions: ["bookworm"]  # Only build armhf for bookworm
+
+# Optional: Binary path inside the archive (if not in root)
+# binary_path: "eza"
+
+# Optional: Package dependencies
+# dependencies:
+#   - libc6
+#   - libgit2-1.7
+
+# Optional: Build settings
+# parallel_builds: true
+# max_parallel: 2
+
+# Optional: Artifact format (auto-detected if not specified)
+# artifact_format: "tar.gz"  # tar.gz, tgz, or zip

@@ -1,0 +1,41 @@
+# Generic Go Project Template
+# Copy this as a starting point for any Go project
+#
+# Usage:
+#   1. Copy to your config: cp templates/go/generic.yaml .github/build-config.yaml
+#   2. Edit package_name, github_repo, and download_pattern
+#   3. Run: ./build.sh .github/build-config.yaml 1.0.0 1
+
+package_name: "my-go-app"
+github_repo: "owner/repo"
+summary: "A brief description of your Go application"
+vendor: "Your Name or Organization"
+license: "MIT"
+
+# Common Go release patterns (choose one):
+
+# Pattern 1: GOOS_GOARCH format (most common)
+download_pattern: "{package_name}_{version}_linux_{arch}.tar.gz"
+architecture_map:
+  amd64: "amd64"
+  arm64: "arm64"
+  armhf: "armv7"
+  i386: "i386"
+
+# Pattern 2: GOOS-GOARCH format
+# download_pattern: "{package_name}_{version}_linux-{arch}.tar.gz"
+# architecture_map:
+#   amd64: "amd64"
+#   arm64: "arm64"
+
+# Pattern 3: Simple architecture name
+# download_pattern: "{package_name}-linux-{arch}.tar.gz"
+# architecture_map:
+#   amd64: "x86_64"
+#   arm64: "aarch64"
+
+# Optional: Binary path if in subdirectory
+# binary_path: "{package_name}"
+
+# Optional: Dependencies (Go binaries are usually static)
+# dependencies: []
