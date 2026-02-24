@@ -11,30 +11,30 @@ on:
         description: The build version
         type: string
         required: true
-      architecture:
-        description: Architecture to build (amd64, arm64, armel, armhf, ppc64el, s390x, riscv64, or 'all' for all architectures)
-        type: choice
-        default: 'all'
-        options:
-          - 'all'
-          - 'amd64'
-          - 'arm64'
-          - 'armel'
-          - 'armhf'
-          - 'ppc64el'
-          - 's390x'
-          - 'riscv64'
 
 permissions:
   contents: write
 
 jobs:
   build:
-    name: Build
+    name: Build (${{ matrix.arch }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64, arm64, armel, armhf, i386, ppc64el, s390x, riscv64, loong64]
+      fail-fast: false
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Restore Docker layer cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/docker-cache
+          key: docker-${{ matrix.arch }}-${{ hashFiles('src/Dockerfile') }}
+          restore-keys: |
+            docker-${{ matrix.arch }}-
 
       - name: Build multi-architecture packages
         uses: ranjithrajv/debian-multiarch-builder@v1
@@ -42,12 +42,19 @@ jobs:
           config-file: 'multiarch-config.yaml'
           version: ${{ inputs.version }}
           build-version: ${{ inputs.build_version }}
-          architecture: ${{ inputs.architecture }}
+          architecture: ${{ matrix.arch }}
+
+      - name: Save Docker layer cache
+        uses: actions/cache@v4
+        if: always()
+        with:
+          path: /tmp/docker-cache
+          key: docker-${{ matrix.arch }}-${{ hashFiles('src/Dockerfile') }}
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: debian-packages
+          name: debian-packages-${{ matrix.arch }}
           path: '*.deb'
 
   release:
@@ -59,7 +66,8 @@ jobs:
       - name: Download All Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: debian-packages
+          pattern: debian-packages-*
+          merge-multiple: true
 
       - name: Publish Release Draft
         uses: softprops/action-gh-release@v2
