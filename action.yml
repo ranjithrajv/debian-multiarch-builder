@@ -153,6 +153,11 @@ runs:
         fi
         chmod +x ./build.sh ./src/main.sh ./src/lib/*.sh
 
+        # Ensure package template files are in output/ for Docker build context
+        if [ ! -d "./output" ]; then
+          cp -r "$ACTION_PATH/templates/output" ./output
+        fi
+
         # Run the build
         ./build.sh "$CONFIG_FILE" "$VERSION" "$BUILD_VERSION" "$ARCHITECTURE"
 
