@@ -100,11 +100,12 @@
     fi
 
     # Get distributions (default to all valid distributions from system.yaml)
-    DISTRIBUTIONS=$(yq eval '.debian_distributions[]' "$package_file" 2>/dev/null | tr '\n' ' ')
-    if [ -z "$DISTRIBUTIONS" ] || [ "$DISTRIBUTIONS" = "null" ]; then
+    # grep -v removes bare '-' tokens that some yq versions emit as YAML list markers
+    DISTRIBUTIONS=$(yq eval '.debian_distributions[]' "$package_file" 2>/dev/null | grep -v '^-$' | grep -v '^null$' | tr '\n' ' ')
+    if [ -z "${DISTRIBUTIONS// /}" ] || [ "$DISTRIBUTIONS" = "null" ]; then
         # Load default distributions from system.yaml
         local system_yaml="$SCRIPT_DIR/data/system.yaml"
-        DISTRIBUTIONS=$(yq eval '.distributions.valid[]' "$system_yaml" 2>/dev/null | tr '\n' ' ')
+        DISTRIBUTIONS=$(yq eval '.distributions.valid[]' "$system_yaml" 2>/dev/null | grep -v '^-$' | grep -v '^null$' | tr '\n' ' ')
         info "No distributions specified, using defaults: $DISTRIBUTIONS"
     fi
 

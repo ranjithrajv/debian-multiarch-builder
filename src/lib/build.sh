@@ -260,6 +260,8 @@ If binaries are in a subdirectory, add 'binary_path' to your config:
     local dist_count=0
 
     for dist in $DISTRIBUTIONS; do
+        # Skip bare '-' or 'null' tokens from yq formatting artifacts
+        [ "$dist" = "-" ] || [ "$dist" = "null" ] && continue
         # Check if this architecture is supported for this distribution
         if ! is_arch_supported_for_dist "$build_arch" "$dist"; then
             info "Skipping $dist for $build_arch (not supported in this distribution)"
