@@ -58,8 +58,9 @@ get_release_pattern() {
             return 1
         fi
         
-        # Replace {version} placeholder
-        pattern="${pattern//\{version\}/$VERSION}"
+        # Replace {version} placeholder (use variable to avoid } closing outer ${...})
+        local _ver='{version}'
+        pattern="${pattern//$_ver/$VERSION}"
         echo "$pattern"
         return 0
     fi

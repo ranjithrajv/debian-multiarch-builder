@@ -88,13 +88,11 @@ get_release_pattern() {
             return 1
         fi
 
-        # Validate pattern has {version} placeholder
-        if [[ ! "$pattern" =~ \\{version\\} ]]; then
-            warning "Release pattern for $arch doesn't contain {version} placeholder: $pattern"
-        fi
-
         # Replace {version} placeholder with actual version
-        pattern="${pattern//\\{version\\}/$VERSION}"
+        # Use a local variable to hold the search string so that the `}` in
+        # {version} does not prematurely close the outer ${...} expansion.
+        local _ver='{version}'
+        pattern="${pattern//$_ver/$VERSION}"
         echo "$pattern"
         return 0
     fi
