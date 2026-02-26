@@ -178,8 +178,10 @@ Please check:
   2. Verify the release_pattern in your config matches actual release assets"
     fi
     
-    # Source download cache library
-    source "$SCRIPT_DIR/lib/download-cache.sh"
+    # Source download cache library if not already loaded via lazy-loading
+    if ! command -v download_with_cache >/dev/null 2>&1; then
+        source "$SCRIPT_DIR/lib/download-cache.sh"
+    fi
     
     # Download with caching
     if ! download_release_asset "$release_pattern" "$archive_name" "$expected_checksum"; then
@@ -193,13 +195,33 @@ Please check:
     info "Extracting $archive_name..."
     case "$ARTIFACT_FORMAT" in
         "tar.gz"|"tgz")
-            if ! tar -xzf "$archive_name" 2>&1; then
-                error "Failed to extract $archive_name (corrupted archive?)"
+            # Detect if archive has a top-level subdirectory matching extract_dir.
+            # Flat archives (e.g. single binary) are extracted into extract_dir.
+            local top_entry
+            top_entry=$(tar -tzf "$archive_name" 2>/dev/null | head -1 | sed 's|^\./||; s|/.*||')
+            if [ "$top_entry" = "$extract_dir" ]; then
+                if ! tar -xzf "$archive_name" 2>&1; then
+                    error "Failed to extract $archive_name (corrupted archive?)"
+                fi
+            else
+                mkdir -p "$extract_dir"
+                if ! tar -xzf "$archive_name" -C "$extract_dir" 2>&1; then
+                    error "Failed to extract $archive_name (corrupted archive?)"
+                fi
             fi
             ;;
         "zip")
-            if ! unzip -q "$archive_name" 2>&1; then
-                error "Failed to extract $archive_name (corrupted archive?)"
+            local zip_top
+            zip_top=$(unzip -Z1 "$archive_name" 2>/dev/null | head -1 | sed 's|/.*||')
+            if [ "$zip_top" = "$extract_dir" ]; then
+                if ! unzip -q "$archive_name" 2>&1; then
+                    error "Failed to extract $archive_name (corrupted archive?)"
+                fi
+            else
+                mkdir -p "$extract_dir"
+                if ! unzip -q "$archive_name" -d "$extract_dir" 2>&1; then
+                    error "Failed to extract $archive_name (corrupted archive?)"
+                fi
             fi
             ;;
         *)
