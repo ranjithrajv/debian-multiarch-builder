@@ -276,6 +276,13 @@ build_all_architectures_parallel() {
             if [ "$status" = "FAILED" ]; then
                 failed=true
                 failed_archs+=("$arch")
+                # Print build log for failed arch before cleanup
+                if [ -f "build_${arch}.log" ]; then
+                    echo ""
+                    echo "   📋 Error log for $arch:"
+                    head -30 "build_${arch}.log"
+                    echo "   ---"
+                fi
             fi
             rm -f "build_${arch}.status" "build_${arch}.log" "build_${arch}.time"
         fi
