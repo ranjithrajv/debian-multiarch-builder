@@ -120,6 +120,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Build summary** - Includes success rate and viral badge
 - **Documentation structure** - Reorganized docs into logical sections
 
+### Fixed - Critical Bug Fixes (2026-02-27)
+
+- **Bash `{version}` parameter expansion corruption** in `discovery.sh` and `discovery-simple.sh`
+  - `${pattern//\{version\}/$VERSION}` was appending `/$VERSION}` as literal text instead of substituting
+  - The `}` inside `{version}` prematurely closes the outer `${...//...}` expansion
+  - Fixed using an intermediate variable: `local _ver='{version}'; pattern="${pattern//$_ver/$VERSION}"`
+- **Flat archive extraction failure** in `build.sh`
+  - Archives that extract a single file/binary directly (no top-level subdirectory) failed with "Binary source not found"
+  - Added archive inspection to detect flat vs. subdirectory layout before extraction
+  - For flat archives: creates the expected directory and extracts with `-C extract_dir`
+  - Applies to both `tar.gz`/`tgz` and `zip` formats
+- **Silent parallel build failures** - builds completing in ~5s with no output
+  - `error()` calling `exit 1` inside background subshells bypassed the branch writing the FAILED status file
+  - Orchestration loop could not detect which architectures had failed
+  - Fixed by adding EXIT trap in `build_architecture_parallel` to guarantee status file is always written
+  - Added build log output in final summary before log cleanup to aid debugging
+- **SCRIPT_DIR clobbering in library files** causing SIGSEGV / infinite recursion
+  - `progress.sh`, `dry-run.sh`, and `zero-config.sh` were overwriting the global `SCRIPT_DIR`
+  - Lazy-loader then resolved paths as `src/lib/lib/foo.sh` → not found → called itself → stack overflow
+  - Fixed by removing `SCRIPT_DIR=` from `progress.sh`; renamed to private `_DR_LIB_DIR` / `_ZC_LIB_DIR` in other files
+- **Source paths missing `/lib/` prefix** in multiple library files
+  - `orchestration.sh`, `build.sh`, `validation.sh`, `discovery-simple.sh` referenced `$SCRIPT_DIR/foo.sh`
+  - Files live under `$SCRIPT_DIR/lib/`; added missing `/lib/` segment to all affected source calls
+- **Dockerfile `sed -i` on gzipped file** corrupting `changelog.Debian.gz`
+  - `sed -i` commands were running after `gzip`, writing into the binary compressed data
+  - Moved all four `sed -i` operations to before the `gzip` call
+- **Demo workflow configuration** (`demo-config.yaml`) using wrong keys and patterns
+  - Used unsupported `architecture_map:` key; config parser reads `.architectures`
+  - Architecture patterns were wrong (incorrect `{version}` usage, wrong armhf arch string)
+  - Fixed to use correct `architectures:` structure with verified asset names from GitHub API
+
 ### Fixed
 - **Zero-config pattern detection** - Handles versions in release tag vs filename
 - **Progress tracking paths** - Corrected SCRIPT_DIR references

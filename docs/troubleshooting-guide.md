@@ -131,10 +131,24 @@ release_pattern: "app-{version}-x86_64.tar.gz"  # If version is in filename
 
 **Problem:** The extracted archive structure doesn't match expectations.
 
-**Solution:**
+There are two common causes:
 
-1. Check the error message for directory listing
-2. Add `binary_path` to your config if binaries are in a subdirectory:
+**1. Flat archive (no subdirectory)**
+
+Some upstreams publish archives that extract a single binary directly to the current directory with no top-level subdirectory (e.g., `./eza` rather than `./eza-v1.0.0/eza`). The action handles this automatically by inspecting the archive before extracting. If you see this error on a flat archive, verify that the `release_pattern` is correct and the archive is downloading successfully.
+
+```bash
+# Check archive structure before extraction
+curl -sL https://github.com/owner/repo/releases/download/v1.0.0/file.tar.gz \
+  | tar -tzf - | head -20
+# Flat: shows   ./binary_name
+# Dir:  shows   binary_name-v1.0.0/
+#               binary_name-v1.0.0/bin/
+```
+
+**2. Binary in a subdirectory**
+
+If the archive extracts a directory with binaries nested inside, use `binary_path`:
 
 ```yaml
 # If binaries are in bin/ subdirectory after extraction
@@ -309,20 +323,63 @@ debian_distributions:
   - your-custom-dist  # Will show warning but continue
 ```
 
-### Warning: "Release pattern doesn't contain {version} placeholder"
+### Release pattern `{version}` placeholder
 
-**Problem:** Pattern is missing `{version}` placeholder.
+**Note:** `{version}` in `release_pattern` is **optional**. Many upstream projects do not include the version number in release asset filenames (e.g., eza publishes `eza_x86_64-unknown-linux-gnu.tar.gz` across all releases). Only add `{version}` if the upstream asset filename actually contains the version string.
 
-**Impact:** Version won't be substituted, downloads may fail.
-
-**Solution:**
+**When to use `{version}`:**
 ```yaml
-# Wrong:
-release_pattern: "app-1.0.0-amd64.tar.gz"
+# ✓ Use when the asset filename contains the version, e.g.:
+# app-1.2.3-x86_64.tar.gz
+release_pattern: "app-{version}-x86_64.tar.gz"
 
-# Correct:
-release_pattern: "app-{version}-amd64.tar.gz"
+# ✗ Do NOT use when the asset filename has no version, e.g.:
+# app_x86_64-unknown-linux-gnu.tar.gz
+release_pattern: "app_x86_64-unknown-linux-gnu.tar.gz"
 ```
+
+**Bash expansion pitfall:** The `{version}` substitution uses bash string replacement. If `{version}` appears inside `${...}`, the inner `}` prematurely closes the outer expansion and corrupts the pattern. The action handles this internally — but if you are forking or extending the action, use an intermediate variable:
+```bash
+# Correct way to substitute {version} in bash:
+local _ver='{version}'
+pattern="${pattern//$_ver/$VERSION}"
+```
+
+## Parallel Build Failures
+
+### Builds complete in ~5 seconds with no packages generated
+
+**Problem:** Parallel architecture builds exit silently with no error output; the final summary shows "no packages were generated."
+
+**Cause:** When `error()` calls `exit 1` deep inside a background subshell, it bypasses the code that writes the FAILED status file. The orchestration loop cannot detect the failure, logs are cleaned up, and the build appears to succeed vacuously.
+
+**Diagnosis:** Check if a status file was written for the failed architecture:
+```bash
+# During a run (from another terminal)
+ls build_*.status
+cat build_amd64.status  # Should say SUCCESS or FAILED
+```
+
+**If status files are missing:** This is a known race condition that was fixed in v0.2.1. Ensure you are on an up-to-date version of the action.
+
+**Workaround for debugging:** Run sequentially to see the error output directly:
+```yaml
+# In your config or workflow input
+parallel_builds: false
+```
+
+Or reduce to a single architecture:
+```yaml
+architecture: amd64
+```
+
+### Failed architecture build log is empty or missing
+
+**Problem:** `build_amd64.log` is empty or the log is cleaned up before you can read it.
+
+**Solution:** The action now prints the first 30 lines of failed build logs to stdout before cleanup. Check the workflow run log output for lines beginning with `Error log for <arch>:`.
+
+For detailed logs, set `parallel_builds: false` to run sequentially — output goes directly to stdout.
 
 ## Getting More Help
 
