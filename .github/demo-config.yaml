@@ -13,11 +13,11 @@ license: "MIT"
 # {version} is replaced with the actual version at build time
 architectures:
   amd64:
-    release_pattern: "eza_{version}_x86_64-unknown-linux-gnu.tar.gz"
+    release_pattern: "eza_x86_64-unknown-linux-gnu.tar.gz"
   arm64:
-    release_pattern: "eza_{version}_aarch64-unknown-linux-gnu.tar.gz"
+    release_pattern: "eza_aarch64-unknown-linux-gnu.tar.gz"
   armhf:
-    release_pattern: "eza_{version}_armv7-unknown-linux-gnu.tar.gz"
+    release_pattern: "eza_arm-unknown-linux-gnueabihf.tar.gz"
 
 # Optional: Enable parallel builds for faster execution
 parallel_builds: true
