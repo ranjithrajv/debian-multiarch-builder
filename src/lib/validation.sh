@@ -124,10 +124,11 @@ fetch_checksum_for_asset() {
         source "$SCRIPT_DIR/lib/download-cache.sh"
     fi
     
-    if ! download_with_cache "$checksum_url" "$checksum_file"; then
+    # Redirect stdout to stderr so INFO log messages don't contaminate the return value
+    if ! download_with_cache "$checksum_url" "$checksum_file" >&2; then
         return 1
     fi
-    
+
     # Extract checksum for our specific asset
     local expected_checksum=""
     
