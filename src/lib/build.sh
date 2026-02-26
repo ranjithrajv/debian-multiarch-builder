@@ -319,9 +319,11 @@ If binaries are in a subdirectory, add 'binary_path' to your config:
         echo "      ❌ Failed: ${#failed_dists[@]} distributions (${failed_dists[*]})"
         echo "      📈 Success Rate: $(( (successful_dists * 100) / ${#dist_names[@]} ))%"
         echo ""
-        echo "   💡 Failed distribution logs available for debugging:"
+        echo "   📋 Failed distribution build logs:"
         for dist in "${failed_dists[@]}"; do
-            echo "      build_${build_arch}_${dist}.log"
+            echo "   --- build_${build_arch}_${dist}.log ---"
+            cat "build_${build_arch}_${dist}.log" 2>/dev/null || echo "   (log not found)"
+            echo "   ---"
         done
         echo ""
     fi
