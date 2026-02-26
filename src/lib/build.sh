@@ -10,17 +10,10 @@ build_distribution() {
 
     FULL_VERSION="${VERSION}-${BUILD_VERSION}+${dist}_${build_arch}"
 
-    # Enhanced Docker build with BuildKit optimization and failure capture
+    # Docker build with failure capture
     local docker_build_log="/tmp/docker-build-${dist}-${build_arch}.log"
-    local cache_dir="/tmp/docker-cache"
-    
-    # Enable Docker BuildKit for better performance
-    export DOCKER_BUILDKIT=1
-    
-    # Create cache directory for this build and setup shared cache
-    mkdir -p "$cache_dir"
-    
-    if ! docker build \
+
+    docker build \
         --progress=plain \
         --tag "${PACKAGE_NAME}-${dist}-${build_arch}" \
         --file "$SCRIPT_DIR/Dockerfile" \
@@ -32,9 +25,9 @@ build_distribution() {
         --build-arg ARCH="$build_arch" \
         --build-arg BINARY_SOURCE="$binary_source" \
         --build-arg GITHUB_REPO="$GITHUB_REPO" \
-        --cache-from "type=local,src=${cache_dir}" \
-        --cache-to "type=local,dest=${cache_dir},mode=max" \
-        . 2>&1 | tee "$docker_build_log"; then
+        . 2>&1 | tee "$docker_build_log"
+    local docker_exit=${PIPESTATUS[0]}
+    if [ $docker_exit -ne 0 ]; then
 
         # Capture Docker build failure details for telemetry
         local docker_error=$(tail -20 "$docker_build_log" | grep -E "(ERROR|error|Error|failed|Failed|FAILED)" | head -5 | tr '\n' '; ' | sed 's/; $//')
@@ -102,9 +95,6 @@ build_distribution() {
     # Clean up Docker image to save space
     docker rmi "${PACKAGE_NAME}-${dist}-${build_arch}" 2>/dev/null || true
     
-    # Clean up cache directory (optional - keep for shared cache)
-    # rm -rf "$cache_dir" 2>/dev/null || true
-
     # Verify the .deb package was created and is non-empty
     if [ ! -s "./${PACKAGE_NAME}_${FULL_VERSION}.deb" ]; then
         record_build_failure "package_extraction" "Generated .deb package is missing or empty: ./${PACKAGE_NAME}_${FULL_VERSION}.deb" "1" "$build_arch" "$dist"
