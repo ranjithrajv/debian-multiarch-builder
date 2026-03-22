@@ -17,9 +17,13 @@ ARG GITHUB_REPO
 RUN --mount=type=cache,target=/var/cache/apt \
     --mount=type=cache,target=/var/lib/apt \
     apt-get update && apt-get install -y \
-    sed \
+    gettext-base \
     gzip \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Expose ARG values as ENV for envsubst (handles naming mismatches)
+ENV DIST=${DEBIAN_DIST} \
+    SUPPORTED_ARCHITECTURES=${ARCH}
 
 # Create directory structure in a single layer
 RUN mkdir -p /output/usr/bin \
@@ -43,19 +47,11 @@ RUN if [ -f /tmp/package-files/README.md ]; then \
     rm -rf /tmp/package-files/
 
 # Process templates and create final files in a single layer
-RUN sed -e "s/PACKAGE_NAME/${PACKAGE_NAME}/g" \
-        -e "s/DIST/${DEBIAN_DIST}/g" \
-        -e "s/BUILD_VERSION/${BUILD_VERSION}/g" \
-        -e "s/VERSION/${VERSION}/g" \
-        -e "s/SUPPORTED_ARCHITECTURES/${ARCH}/g" \
-        -e "s|GITHUB_REPO|${GITHUB_REPO}|g" \
-        /tmp/control.template > /output/DEBIAN/control
+RUN envsubst '${PACKAGE_NAME} ${VERSION} ${BUILD_VERSION} ${DIST} ${SUPPORTED_ARCHITECTURES} ${GITHUB_REPO}' \
+        < /tmp/control.template > /output/DEBIAN/control
 
-RUN sed -e "s/PACKAGE_NAME/${PACKAGE_NAME}/g" \
-        -e "s/DIST/${DEBIAN_DIST}/g" \
-        -e "s/FULL_VERSION/${FULL_VERSION}/g" \
-        -e "s/VERSION/${VERSION}/g" \
-        /tmp/changelog.template | gzip -9 > "/output/usr/share/doc/${PACKAGE_NAME}/changelog.Debian.gz"
+RUN envsubst '${PACKAGE_NAME} ${FULL_VERSION} ${DIST} ${VERSION}' \
+        < /tmp/changelog.template | gzip -9 > "/output/usr/share/doc/${PACKAGE_NAME}/changelog.Debian.gz"
 
 # Cleanup temporary files
 RUN rm -f /tmp/control.template /tmp/changelog.template

@@ -73,23 +73,18 @@ build_distribution() {
     # Clean up successful build log
     rm -f "$docker_build_log" 2>/dev/null || true
 
-    # Extract package from multi-stage build (optimized extraction)
-    local container_name="extract-${PACKAGE_NAME}-${dist}-${build_arch}-$$"
-    if ! docker run --name "$container_name" --rm \
-        "${PACKAGE_NAME}-${dist}-${build_arch}" \
-        cat "/${PACKAGE_NAME}_${FULL_VERSION}.deb" > "./${PACKAGE_NAME}_${FULL_VERSION}.deb" 2>/dev/null; then
-        # Fallback to create/copy method if run fails
-        id="$(docker create "${PACKAGE_NAME}-${dist}-${build_arch}" 2>/dev/null || echo "")"
-        if [ -n "$id" ]; then
-            if docker cp "$id:/${PACKAGE_NAME}_${FULL_VERSION}.deb" "./${PACKAGE_NAME}_${FULL_VERSION}.deb" 2>&1; then
-                docker rm "$id" || true
-            else
-                docker rm "$id" || true
-                return 1
-            fi
+    # Extract package using docker create/cp (works with single-stage and scratch images)
+    local container_id
+    container_id="$(docker create "${PACKAGE_NAME}-${dist}-${build_arch}" / 2>/dev/null || echo "")"
+    if [ -n "$container_id" ]; then
+        if docker cp "$container_id:/${PACKAGE_NAME}_${FULL_VERSION}.deb" "./${PACKAGE_NAME}_${FULL_VERSION}.deb" 2>/dev/null; then
+            docker rm "$container_id" >/dev/null 2>&1 || true
         else
+            docker rm "$container_id" >/dev/null 2>&1 || true
             return 1
         fi
+    else
+        return 1
     fi
     
     # Clean up Docker image to save space

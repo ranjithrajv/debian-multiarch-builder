@@ -12,9 +12,13 @@ ARG GITHUB_REPO
 
 # Install necessary tools
 RUN apt-get update && apt-get install -y \
-    sed \
+    gettext-base \
     gzip \
     && rm -rf /var/lib/apt/lists/*
+
+# Expose ARG values as ENV for envsubst (handles naming mismatches)
+ENV DIST=${DEBIAN_DIST} \
+    SUPPORTED_ARCHITECTURES=${ARCH}
 
 # Create directory structure
 RUN mkdir -p /output/usr/bin
@@ -38,22 +42,16 @@ RUN if [ -f /tmp/package-files/README.md ]; then \
         cp /tmp/package-files/README.md /output/usr/share/doc/${PACKAGE_NAME}/; \
     fi
 
-# Replace placeholders in changelog (must be done BEFORE gzip)
-RUN sed -i "s/PACKAGE_NAME/${PACKAGE_NAME}/g" /output/usr/share/doc/${PACKAGE_NAME}/changelog.Debian
-RUN sed -i "s/DIST/${DEBIAN_DIST}/g" /output/usr/share/doc/${PACKAGE_NAME}/changelog.Debian
-RUN sed -i "s/FULL_VERSION/${FULL_VERSION}/g" /output/usr/share/doc/${PACKAGE_NAME}/changelog.Debian
-RUN sed -i "s/VERSION/${VERSION}/g" /output/usr/share/doc/${PACKAGE_NAME}/changelog.Debian
+# Process changelog (substitute placeholders, then compress)
+RUN envsubst '${PACKAGE_NAME} ${FULL_VERSION} ${DIST} ${VERSION}' \
+        < /output/usr/share/doc/${PACKAGE_NAME}/changelog.Debian | \
+        gzip -9 > /output/usr/share/doc/${PACKAGE_NAME}/changelog.Debian.gz && \
+        rm /output/usr/share/doc/${PACKAGE_NAME}/changelog.Debian
 
-# Compress changelog
-RUN gzip -9 /output/usr/share/doc/${PACKAGE_NAME}/changelog.Debian
-
-# Replace placeholders in control file
-RUN sed -i "s/PACKAGE_NAME/${PACKAGE_NAME}/g" /output/DEBIAN/control
-RUN sed -i "s/DIST/${DEBIAN_DIST}/g" /output/DEBIAN/control
-RUN sed -i "s/BUILD_VERSION/${BUILD_VERSION}/g" /output/DEBIAN/control
-RUN sed -i "s/VERSION/${VERSION}/g" /output/DEBIAN/control
-RUN sed -i "s/SUPPORTED_ARCHITECTURES/${ARCH}/g" /output/DEBIAN/control
-RUN sed -i "s|GITHUB_REPO|${GITHUB_REPO}|g" /output/DEBIAN/control
+# Process control file
+RUN envsubst '${PACKAGE_NAME} ${VERSION} ${BUILD_VERSION} ${DIST} ${SUPPORTED_ARCHITECTURES} ${GITHUB_REPO}' \
+        < /output/DEBIAN/control > /output/DEBIAN/control.tmp && \
+        mv /output/DEBIAN/control.tmp /output/DEBIAN/control
 
 # Build the .deb package
 RUN dpkg-deb --build /output /${PACKAGE_NAME}_${FULL_VERSION}.deb

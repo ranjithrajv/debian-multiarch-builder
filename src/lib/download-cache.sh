@@ -97,8 +97,8 @@ download_with_cache() {
         local attempt=0
         
         while [ $attempt -lt $max_retries ]; do
-            if wget --progress=bar:force --retry-connrefused --waitretry=1 \
-                   --timeout=30 -t 3 -O "${cache_file}.tmp" "$url" 2>&1; then
+            if curl -fL --progress-bar --connect-timeout 30 --max-time 300 \
+                   -o "${cache_file}.tmp" "$url" 2>&1; then
                 # Download successful
                 
                 # Verify checksum if provided

@@ -9,30 +9,46 @@ mkdir -p "$API_CACHE_DIR"
 # Function to implement exponential backoff for API calls
 api_call_with_retry() {
     local url="$1"
+
+    # Use gh CLI if available — handles auth, rate limiting, and retries natively.
+    # gh is pre-installed on GitHub Actions ubuntu-latest runners.
+    if command -v gh &>/dev/null; then
+        local endpoint="${url#https://api.github.com/}"
+        gh api "$endpoint" 2>/dev/null
+        return $?
+    fi
+
+    # curl fallback for environments without gh CLI
     local max_retries=3
     local retry_delay=1
     local attempt=0
-    
+
     while [ $attempt -lt $max_retries ]; do
-        local response=$(curl -sL \
+        local response
+        response=$(curl -sL \
             -H "Accept: application/vnd.github.v3+json" \
             -w "\n%{http_code}\n%{http_code}\n" \
             "$url" 2>/dev/null)
-        
-        local http_code=$(echo "$response" | tail -n1)
-        local body=$(echo "$response" | head -n -2)
-        
+
+        local http_code
+        http_code=$(echo "$response" | tail -n1)
+        local body
+        body=$(echo "$response" | head -n -2)
+
         # Check for rate limiting
         if [ "$http_code" = "429" ] || [ "$http_code" = "403" ]; then
-            local rate_limit_remaining=$(curl -s -H "Accept: application/vnd.github.v3+json" \
+            local rate_limit_remaining
+            rate_limit_remaining=$(curl -s -H "Accept: application/vnd.github.v3+json" \
                 "https://api.github.com/rate_limit" | jq -r '.rate.remaining // 0' 2>/dev/null)
-            
+
             if [ "$rate_limit_remaining" = "0" ]; then
-                local reset_time=$(curl -s -H "Accept: application/vnd.github.v3+json" \
+                local reset_time
+                reset_time=$(curl -s -H "Accept: application/vnd.github.v3+json" \
                     "https://api.github.com/rate_limit" | jq -r '.rate.reset // 0' 2>/dev/null)
-                local current_time=$(date +%s)
+                local current_time
+                current_time=$(date +%s)
                 local sleep_time=$((reset_time - current_time + 1))
-                
+
                 if [ $sleep_time -gt 0 ] && [ $sleep_time -lt 300 ]; then
                     warning "GitHub API rate limit hit. Waiting ${sleep_time}s for reset..."
                     sleep $sleep_time
@@ -40,13 +56,13 @@ api_call_with_retry() {
                 fi
             fi
         fi
-        
+
         # Success response
         if [ "$http_code" = "200" ]; then
             echo "$body"
             return 0
         fi
-        
+
         # Handle other errors
         attempt=$((attempt + 1))
         if [ $attempt -lt $max_retries ]; then
@@ -55,7 +71,7 @@ api_call_with_retry() {
             retry_delay=$((retry_delay * 2))
         fi
     done
-    
+
     error "API call failed after $max_retries attempts"
     return 1
 }
