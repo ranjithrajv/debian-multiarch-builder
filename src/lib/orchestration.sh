@@ -103,24 +103,37 @@ build_all_architectures_parallel() {
 
     # Export all variables needed by worker subprocesses spawned by GNU parallel.
     # GNU parallel forks fresh bash processes that do not inherit shell variables,
-    # only exported environment variables.
+    # only exported environment variables. This includes the configuration state
+    # parsed in the main process (AUTO_DISCOVERY, ARTIFACT_FORMAT, BINARY_PATH,
+    # DISTRIBUTIONS) — without these the workers run with unset config and fail
+    # architecture detection.
     export SCRIPT_DIR PACKAGE_NAME VERSION BUILD_VERSION GITHUB_REPO
     export MAX_PARALLEL LINTIAN_CHECK TELEMETRY_ENABLED SAVE_BASELINE
     export ARCH CONFIG_FILE ACTION_PATH
+    export AUTO_DISCOVERY ARTIFACT_FORMAT BINARY_PATH DISTRIBUTIONS 2>/dev/null || true
     # Telemetry state (may be unset if telemetry is disabled — that is fine)
     export BUILD_START_TIME TELEMETRY_DIR 2>/dev/null || true
+
+    # Worker entrypoint for GNU parallel. GNU parallel strips surrounding quotes
+    # from `bash -c '...'`, which corrupts inline scripts; using an exported
+    # function (--env debian_arch_worker) is robust across parallel versions.
+    debian_arch_worker() {
+        source "$SCRIPT_DIR/lib/lazy-loading.sh"
+        source "$SCRIPT_DIR/lib/orchestration.sh"
+        build_architecture_parallel "$1"
+    }
+    export -f debian_arch_worker
 
     # Run builds via GNU parallel. Each worker re-sources the library stack
     # through the lazy-loader, then sources orchestration.sh to get
     # build_architecture_parallel, and calls it with the architecture name.
     # --halt never  : don't cancel remaining jobs on failure (we check status files)
     # --line-buffer : flush each output line immediately for CI log readability
-    parallel --jobs "$adjusted_parallel" \
+    parallel --env debian_arch_worker \
+             --jobs "$adjusted_parallel" \
              --halt never \
              --line-buffer \
-             bash -c 'source "$SCRIPT_DIR/lib/lazy-loading.sh" && \
-                      source "$SCRIPT_DIR/lib/orchestration.sh" && \
-                      build_architecture_parallel "$1"' _ {} \
+             debian_arch_worker {} \
              ::: "${arch_array[@]}"
 
     # Check for any failures and provide detailed summary
