@@ -199,9 +199,23 @@ Please check:
         "tar.gz"|"tgz")
             # Detect if archive has a top-level subdirectory matching extract_dir.
             # Flat archives (e.g. single binary) are extracted into extract_dir.
-            local top_entry
-            top_entry=$(tar -tzf "$archive_name" 2>/dev/null | head -1 | sed 's|^\./||; s|/.*||')
-            if [ "$top_entry" = "$extract_dir" ]; then
+            #
+            # A name match alone isn't enough: some upstreams (e.g.
+            # mikefarah/yq) ship a flat archive whose binary happens to be
+            # named identically to the archive's own basename (both
+            # "yq_linux_loong64"), which isn't a wrapping directory at all -
+            # extracting "in place" for that case leaves no directory at
+            # extract_dir, only a same-named file, and the later COPY into
+            # the build container fails. Requiring the raw tar entry to
+            # actually be a directory member (name followed by "/")
+            # distinguishes the two cases.
+            local top_raw top_entry top_is_dir=false
+            top_raw=$(tar -tzf "$archive_name" 2>/dev/null | head -1 | sed 's|^\./||')
+            top_entry=$(echo "$top_raw" | sed 's|/.*||')
+            case "$top_raw" in
+                "$top_entry"/*) top_is_dir=true ;;
+            esac
+            if [ "$top_entry" = "$extract_dir" ] && [ "$top_is_dir" = true ]; then
                 if ! tar -xzf "$archive_name" 2>&1; then
                     error "Failed to extract $archive_name (corrupted archive?)"
                 fi
@@ -213,9 +227,15 @@ Please check:
             fi
             ;;
         "zip")
-            local zip_top
-            zip_top=$(unzip -Z1 "$archive_name" 2>/dev/null | head -1 | sed 's|/.*||')
-            if [ "$zip_top" = "$extract_dir" ]; then
+            # Same directory-vs-same-named-file distinction as the tar.gz
+            # case above.
+            local zip_top_raw zip_top zip_top_is_dir=false
+            zip_top_raw=$(unzip -Z1 "$archive_name" 2>/dev/null | head -1)
+            zip_top=$(echo "$zip_top_raw" | sed 's|/.*||')
+            case "$zip_top_raw" in
+                "$zip_top"/*) zip_top_is_dir=true ;;
+            esac
+            if [ "$zip_top" = "$extract_dir" ] && [ "$zip_top_is_dir" = true ]; then
                 if ! unzip -q "$archive_name" 2>&1; then
                     error "Failed to extract $archive_name (corrupted archive?)"
                 fi
