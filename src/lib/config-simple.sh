@@ -23,6 +23,14 @@ parse_config() {
     GITHUB_REPO=$(yq eval '.github_repo' "$package_file")
     ARTIFACT_FORMAT=$(yq eval '.artifact_format // "tar.gz"' "$package_file")
     BINARY_PATH=$(yq eval '.binary_path // ""' "$package_file")
+
+    # Short package description for the control file's Description synopsis.
+    # Falls back to a minimal but accurate description (rather than the
+    # control template's literal placeholder text) when not configured.
+    PACKAGE_DESCRIPTION=$(yq eval '.description // ""' "$package_file")
+    if [ "$PACKAGE_DESCRIPTION" = "null" ] || [ -z "$PACKAGE_DESCRIPTION" ]; then
+        PACKAGE_DESCRIPTION="${PACKAGE_NAME}, packaged from ${GITHUB_REPO}"
+    fi
     
     # Simple parallel build configuration
     MAX_PARALLEL="${MAX_PARALLEL:-2}"

@@ -34,15 +34,7 @@
     # Parse package configuration
     PACKAGE_NAME=$(yq eval '.package_name' "$package_file")
     GITHUB_REPO=$(yq eval '.github_repo' "$package_file")
-
-    # Short package description for the control file's Description synopsis.
-    # Falls back to a minimal but accurate description (rather than the
-    # control template's literal placeholder text) when not configured.
-    PACKAGE_DESCRIPTION=$(yq eval '.description // ""' "$package_file")
-    if [ "$PACKAGE_DESCRIPTION" = "null" ] || [ -z "$PACKAGE_DESCRIPTION" ]; then
-        PACKAGE_DESCRIPTION="${PACKAGE_NAME}, packaged from ${GITHUB_REPO}"
-    fi
-
+    
     # Check if artifact_format is explicitly defined in the config
     local config_artifact_format=$(yq eval '.artifact_format' "$package_file")
     if [ "$config_artifact_format" = "null" ] || [ -z "$config_artifact_format" ]; then
