@@ -14,8 +14,8 @@ ARG BINARY_SOURCE
 ARG GITHUB_REPO
 
 # Install necessary tools and cleanup in a single layer
-RUN --mount=type=cache,target=/var/cache/apt \
-    --mount=type=cache,target=/var/lib/apt \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install -y \
     gettext-base \
     gzip \
