@@ -43,7 +43,7 @@ RUN mkdir -p /output/usr/bin \
 COPY ${BINARY_SOURCE}/* /tmp/binary-source/
 RUN for f in /tmp/binary-source/*; do \
         [ -f "$f" ] || continue; \
-        file -b "$f" | grep -q "^ELF " && cp "$f" /output/usr/bin/; \
+        file -b "$f" | grep -q "^ELF " && cp "$f" /output/usr/bin/ || true; \
     done \
     && chmod +x /output/usr/bin/* \
     && rm -rf /tmp/binary-source
