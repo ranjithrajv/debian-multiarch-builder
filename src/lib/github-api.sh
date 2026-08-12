@@ -234,6 +234,40 @@ format_license_text_for_copyright() {
     echo "$raw" | sed 's/^$/./' | sed 's/^/ /'
 }
 
+# Detect the common Rust dual-license convention: separate LICENSE-APACHE
+# and LICENSE-MIT files at repo root (used by uv and many other Rust CLIs).
+# GitHub's /license endpoint only ever reports one primary license, which
+# understates a genuine "Apache-2.0 OR MIT" dual grant. On success, sets
+# MULTI_LICENSE_SPDX and MULTI_LICENSE_RAW_TEXT and returns 0; returns 1
+# (and leaves nothing set) when the repo doesn't use this pattern.
+detect_multiple_license() {
+    local contents
+    contents=$(curl -sL -H "Accept: application/vnd.github.v3+json" \
+        ${GITHUB_TOKEN:+-H "Authorization: token $GITHUB_TOKEN"} \
+        "https://api.github.com/repos/${GITHUB_REPO}/contents" 2>/dev/null)
+
+    local names
+    names=$(echo "$contents" | jq -r '.[]?.name' 2>/dev/null)
+
+    if ! echo "$names" | grep -qx "LICENSE-APACHE"; then return 1; fi
+    if ! echo "$names" | grep -qx "LICENSE-MIT"; then return 1; fi
+
+    local apache_text mit_text
+    apache_text=$(curl -sL -H "Accept: application/vnd.github.v3.raw" \
+        ${GITHUB_TOKEN:+-H "Authorization: token $GITHUB_TOKEN"} \
+        "https://api.github.com/repos/${GITHUB_REPO}/contents/LICENSE-APACHE" 2>/dev/null)
+    mit_text=$(curl -sL -H "Accept: application/vnd.github.v3.raw" \
+        ${GITHUB_TOKEN:+-H "Authorization: token $GITHUB_TOKEN"} \
+        "https://api.github.com/repos/${GITHUB_REPO}/contents/LICENSE-MIT" 2>/dev/null)
+
+    if [ -z "$apache_text" ] || [ -z "$mit_text" ]; then return 1; fi
+
+    MULTI_LICENSE_SPDX="Apache-2.0 or MIT"
+    MULTI_LICENSE_RAW_TEXT=$(printf 'Dual-licensed under either of:\n\n=== Apache License 2.0 ===\n\n%s\n\n=== MIT License ===\n\n%s' \
+        "$apache_text" "$mit_text")
+    return 0
+}
+
 # Fetch the upstream repo's detected license (SPDX id + full text) via the
 # GitHub API's /license endpoint. Populates LICENSE_SPDX and LICENSE_TEXT
 # (the latter already formatted for direct use in a copyright file's License
@@ -272,6 +306,14 @@ fetch_upstream_license() {
 
     if [ -z "$LICENSE_SPDX" ] || [ "$LICENSE_SPDX" = "null" ]; then
         LICENSE_SPDX="NOASSERTION"
+    fi
+
+    # Prefer the Rust dual MIT/Apache-2.0 convention when present - a single
+    # detected license (whichever GitHub picks as "primary") understates a
+    # genuine dual grant, e.g. uv is Apache-2.0 OR MIT, not just Apache-2.0.
+    if detect_multiple_license; then
+        LICENSE_SPDX="$MULTI_LICENSE_SPDX"
+        raw_text="$MULTI_LICENSE_RAW_TEXT"
     fi
 
     jq -n --arg spdx "$LICENSE_SPDX" --arg text "$raw_text" \
