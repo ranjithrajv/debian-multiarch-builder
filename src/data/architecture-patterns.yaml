@@ -11,7 +11,11 @@ architecture_patterns:
   # excluded - matching them here would ship an ABI-incompatible binary.
   armel: "armel|armeabi([^h]|$)|arm-.*eabi([^h]|$)"
   armhf: "armv7|armhf|arm-.*gnueabihf"
-  i386: "i686|i386|x86"
+  # "x86" alone would also match "x86_64" (amd64) as a substring, so require
+  # it NOT be followed by "_" (excludes "x86_64" while still matching a bare
+  # "x86" token like lazygit's "..._linux_32-bit" sibling naming does not
+  # need this alternative, but other upstreams' plain "x86" asset names do).
+  i386: "i686|i386|x86[^_]|x86$|32-bit"
   ppc64el: "powerpc64le|ppc64le"
   s390x: "s390x"
   riscv64: "riscv64gc|riscv64"

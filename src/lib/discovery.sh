@@ -27,17 +27,28 @@ auto_discover_pattern() {
         grep -v -i "sha256\|checksum\|source" | \
         grep -iE "$pattern" | \
         grep -i "linux" || true)
-    
+
     if [ -z "$filtered_assets" ]; then
         return 1
     fi
-    
-    # Get first match
+
+    # Prefer builds by auto_discovery_preferences (gnu > musl > linux) before
+    # falling back to the first match, so e.g. a gnu build is picked over an
+    # equally-matching musl one when both are available for an architecture.
+    local build_type
+    for build_type in $(get_auto_discovery_preferences); do
+        local preferred_match=$(echo "$filtered_assets" | grep -i "$build_type" | head -1)
+        if [ -n "$preferred_match" ]; then
+            echo "$preferred_match"
+            return 0
+        fi
+    done
+
     local matched_asset=$(echo "$filtered_assets" | head -1)
     if [ -z "$matched_asset" ]; then
         return 1
     fi
-    
+
     echo "$matched_asset"
     return 0
 }
@@ -45,11 +56,10 @@ auto_discover_pattern() {
 # Get release pattern for architecture
 get_release_pattern() {
     local arch=$1
-    
+
     if [ "$AUTO_DISCOVERY" = "true" ]; then
-        # Auto-discovery mode - return placeholder for now
-        echo "{arch}_${version}.${ARTIFACT_FORMAT:-tar.gz}"
-        return 0
+        auto_discover_pattern "$arch"
+        return $?
     else
         # Manual mode
         local pattern=$(yq eval ".architectures.${arch}.release_pattern" "$CONFIG_FILE")
