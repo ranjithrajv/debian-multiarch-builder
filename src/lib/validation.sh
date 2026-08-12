@@ -64,10 +64,30 @@ verify_checksum() {
     # Extract the checksum for our specific file
     local expected_checksum=""
     if grep -q "$archive_name" "$checksum_file" 2>/dev/null; then
-        expected_checksum=$(grep "$archive_name" "$checksum_file" | awk '{print $1}')
+        local match_line=$(grep "$archive_name" "$checksum_file" | head -1)
+        local first_field=$(echo "$match_line" | awk '{print $1}')
+        if [ "$first_field" = "$archive_name" ]; then
+            # "Filename-first" checksum layout (e.g. GoReleaser's
+            # multi-algorithm "extra checksums" template, used by
+            # mikefarah/yq): field 1 is the filename itself, not a hash,
+            # with one column per algorithm after it - resolve which
+            # column is SHA-256 via a sibling "*_hashes_order" file
+            # rather than assuming field 1 is a hash.
+            expected_checksum=$(resolve_multialgo_checksum "$match_line" "$checksum_file")
+        else
+            expected_checksum="$first_field"
+        fi
     elif [ -f "$checksum_file" ] && [ $(wc -l < "$checksum_file") -eq 1 ]; then
         # Single checksum file for single archive
         expected_checksum=$(awk '{print $1}' "$checksum_file")
+    fi
+
+    # A real SHA-256 is exactly 64 hex characters - anything else means
+    # we mis-parsed the checksum file's format. Skip verification rather
+    # than fail the build on our own parsing error.
+    if [ -n "$expected_checksum" ] && ! [[ "$expected_checksum" =~ ^[a-f0-9]{64}$ ]]; then
+        warning "Parsed checksum '$expected_checksum' doesn't look like a SHA-256 hash, skipping verification"
+        expected_checksum=""
     fi
 
     if [ -z "$expected_checksum" ]; then
@@ -94,6 +114,31 @@ Actual:   $actual_checksum
 
 The downloaded file may be corrupted or tampered with."
     fi
+}
+
+# Resolve a SHA-256 value from a checksum-file line where field 1 is the
+# archive filename (not a hash), followed by one column per hash
+# algorithm in the order listed by a sibling "<checksum_file>_hashes_order"
+# file (e.g. GoReleaser's multi-algorithm "extra checksums" template,
+# used by mikefarah/yq). Echoes the SHA-256 value, or nothing if the
+# order file isn't available or doesn't list SHA-256.
+resolve_multialgo_checksum() {
+    local match_line="$1" checksum_file="$2"
+    local order_file="${checksum_file}_hashes_order"
+    local order_url="https://github.com/${GITHUB_REPO}/releases/download/${VERSION}/${order_file}"
+
+    if ! command -v download_with_cache >/dev/null 2>&1; then
+        source "$SCRIPT_DIR/lib/download-cache.sh"
+    fi
+
+    download_with_cache "$order_url" "$order_file" >&2 || return 1
+
+    local sha256_line
+    sha256_line=$(grep -n -m1 -ix "SHA-256" "$order_file" 2>/dev/null | cut -d: -f1)
+    rm -f "$order_file"
+    [ -n "$sha256_line" ] || return 1
+
+    echo "$match_line" | awk -v f="$((sha256_line + 1))" '{print $f}'
 }
 
 # Function to fetch checksum for a specific asset (used by download cache)
@@ -131,26 +176,41 @@ fetch_checksum_for_asset() {
 
     # Extract checksum for our specific asset
     local expected_checksum=""
-    
+
     # Try different checksum formats
     if [ -f "$checksum_file" ]; then
         # SHA256 format: "hash  filename"
         expected_checksum=$(grep -F "$asset_name" "$checksum_file" 2>/dev/null | awk '{print $1}' | head -1)
-        
+
         # If not found, try other formats
         if [ -z "$expected_checksum" ]; then
             # Format: "hash *filename" (common in GNU coreutils)
             expected_checksum=$(grep -F "$asset_name" "$checksum_file" 2>/dev/null | awk '{print $1}' | head -1)
         fi
-        
+
         if [ -z "$expected_checksum" ]; then
             # Format: "hash:filename" or "hash filename" (case insensitive)
             expected_checksum=$(grep -iF "$asset_name" "$checksum_file" 2>/dev/null | awk -F'[:[:space:]]' '{print $1}' | head -1)
         fi
-        
+
+        # "Filename-first" layout (e.g. GoReleaser's multi-algorithm
+        # "extra checksums" template, used by mikefarah/yq): the above
+        # patterns all grab field 1, which is the filename itself here,
+        # not a hash. Resolve the real SHA-256 column instead.
+        if [ "$expected_checksum" = "$asset_name" ]; then
+            local match_line=$(grep -F "$asset_name" "$checksum_file" 2>/dev/null | head -1)
+            expected_checksum=$(resolve_multialgo_checksum "$match_line" "$checksum_file")
+        fi
+
+        # A real SHA-256 is exactly 64 hex characters - anything else
+        # means we mis-parsed the file's format. Don't return garbage.
+        if [ -n "$expected_checksum" ] && ! [[ "$expected_checksum" =~ ^[a-f0-9]{64}$ ]]; then
+            expected_checksum=""
+        fi
+
         rm -f "$checksum_file"
     fi
-    
+
     if [ -n "$expected_checksum" ]; then
         echo "$expected_checksum"
         return 0
