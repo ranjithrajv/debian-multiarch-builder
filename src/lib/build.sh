@@ -30,6 +30,7 @@ build_distribution() {
         --build-arg ARCH="$build_arch" \
         --build-arg BINARY_SOURCE="$binary_source" \
         --build-arg GITHUB_REPO="$GITHUB_REPO" \
+        --build-arg DESCRIPTION="$PACKAGE_DESCRIPTION" \
         . 2>&1 | tee "$docker_build_log"
     local docker_exit=${PIPESTATUS[0]}
     if [ $docker_exit -ne 0 ]; then

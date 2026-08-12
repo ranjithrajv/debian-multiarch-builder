@@ -12,6 +12,7 @@ ARG FULL_VERSION
 ARG ARCH
 ARG BINARY_SOURCE
 ARG GITHUB_REPO
+ARG DESCRIPTION
 
 # Install necessary tools and cleanup in a single layer
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -47,7 +48,7 @@ RUN if [ -f /tmp/package-files/README.md ]; then \
     rm -rf /tmp/package-files/
 
 # Process templates and create final files in a single layer
-RUN envsubst '${PACKAGE_NAME} ${VERSION} ${BUILD_VERSION} ${DIST} ${SUPPORTED_ARCHITECTURES} ${GITHUB_REPO}' \
+RUN envsubst '${PACKAGE_NAME} ${VERSION} ${BUILD_VERSION} ${DIST} ${SUPPORTED_ARCHITECTURES} ${GITHUB_REPO} ${DESCRIPTION}' \
         < /tmp/control.template > /output/DEBIAN/control
 
 RUN envsubst '${PACKAGE_NAME} ${FULL_VERSION} ${DIST} ${VERSION}' \

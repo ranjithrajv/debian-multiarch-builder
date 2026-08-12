@@ -241,7 +241,7 @@ generate_config() {
 
 package_name: "$package_name"
 github_repo: "$repo"
-summary: "$description"
+description: "$description"
 license: "$license"
 
 # Auto-detected download pattern
