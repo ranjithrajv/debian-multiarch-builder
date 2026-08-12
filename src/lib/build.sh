@@ -34,6 +34,7 @@ build_distribution() {
         --build-arg FULL_VERSION="$FULL_VERSION" \
         --build-arg ARCH="$build_arch" \
         --build-arg BINARY_SOURCE="$binary_source" \
+        --build-arg BINARY_RENAME="$BINARY_RENAME" \
         --build-arg GITHUB_REPO="$GITHUB_REPO" \
         --build-arg DESCRIPTION="$PACKAGE_DESCRIPTION" \
         --build-arg LICENSE_SPDX="$LICENSE_SPDX" \

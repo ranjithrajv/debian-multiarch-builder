@@ -11,6 +11,7 @@ ARG BUILD_VERSION
 ARG FULL_VERSION
 ARG ARCH
 ARG BINARY_SOURCE
+ARG BINARY_RENAME
 ARG GITHUB_REPO
 ARG DESCRIPTION
 ARG LICENSE_SPDX
@@ -47,6 +48,22 @@ RUN for f in /tmp/binary-source/*; do \
     done \
     && chmod +x /output/usr/bin/* \
     && rm -rf /tmp/binary-source
+
+# Some upstreams embed the OS/arch suffix directly in the binary's own
+# filename inside the release archive (e.g. mikefarah/yq ships
+# "yq_linux_amd64", "yq_linux_loong64", etc. rather than a plain "yq"),
+# which would otherwise install an executable users can't guess the name
+# of. When binary_rename is set in package.yaml and exactly one
+# executable was found, rename it to the expected command name.
+RUN if [ -n "$BINARY_RENAME" ]; then \
+        count=$(find /output/usr/bin -maxdepth 1 -type f | wc -l); \
+        if [ "$count" = "1" ]; then \
+            f=$(find /output/usr/bin -maxdepth 1 -type f); \
+            mv "$f" "/output/usr/bin/$BINARY_RENAME"; \
+        else \
+            echo "WARNING: binary_rename set but found $count executables in /usr/bin, skipping rename" >&2; \
+        fi \
+    fi
 
 # Copy package metadata files
 COPY output/DEBIAN/control /tmp/control.template

@@ -23,6 +23,11 @@ parse_config() {
     GITHUB_REPO=$(yq eval '.github_repo' "$package_file")
     ARTIFACT_FORMAT=$(yq eval '.artifact_format // "tar.gz"' "$package_file")
     BINARY_PATH=$(yq eval '.binary_path // ""' "$package_file")
+    # Some upstreams embed the OS/arch suffix directly in the binary's own
+    # filename inside the release archive (e.g. mikefarah/yq ships
+    # "yq_linux_amd64", "yq_linux_loong64", etc., not a plain "yq"), which
+    # would otherwise install an unrunnable, oddly-named executable.
+    BINARY_RENAME=$(yq eval '.binary_rename // ""' "$package_file")
 
     # Short package description for the control file's Description synopsis.
     # Falls back to a minimal but accurate description (rather than the
