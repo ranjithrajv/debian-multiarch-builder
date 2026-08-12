@@ -151,7 +151,7 @@ build_all_architectures_parallel() {
                 if [ -f "build_${arch}.log" ]; then
                     echo ""
                     echo "   📋 Error log for $arch:"
-                    head -30 "build_${arch}.log"
+                    cat "build_${arch}.log"
                     echo "   ---"
                 fi
             fi
