@@ -96,7 +96,7 @@ load_essential_libraries() {
 
 # Optional libraries that can be loaded on demand
 get_optional_libraries() {
-    echo "config-simple discovery-simple build orchestration summary telemetry github-api validation download-cache resource-pool"
+    echo "config discovery build orchestration summary telemetry github-api validation download-cache resource-pool"
 }
 
 # Preload specific libraries based on feature flags

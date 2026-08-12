@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Simplified configuration module - essential functionality only
+# Configuration parsing and validation
 
 # Source data files and utilities  
 source "$SCRIPT_DIR/data/yaml-utils.sh"

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Simplified discovery module
+# Auto-discovery of release assets and architecture patterns
 
 # Source utilities
 source "$SCRIPT_DIR/data/yaml-utils.sh"

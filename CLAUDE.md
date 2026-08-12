@@ -17,9 +17,9 @@ This is a comprehensive GitHub Action for building Debian packages across multip
 
 ### Library Modules
 - **utils.sh**: Common utility functions
-- **config-simple.sh**: Configuration parsing and validation
+- **config.sh**: Configuration parsing and validation
 - **github-api.sh**: GitHub API interactions and release fetching
-- **discovery-simple.sh**: Auto-discovery of release assets and patterns
+- **discovery.sh**: Auto-discovery of release assets and patterns
 - **validation.sh**: Version and checksum validation
 - **lintian.sh**: Lintian package validation
 - **telemetry.sh**: Build metrics and performance monitoring
