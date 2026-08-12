@@ -20,6 +20,7 @@ ARG LICENSE_TEXT
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install -y \
+    file \
     gettext-base \
     gzip \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
@@ -33,9 +34,19 @@ RUN mkdir -p /output/usr/bin \
     && mkdir -p "/output/usr/share/doc/${PACKAGE_NAME}" \
     && mkdir -p /output/DEBIAN
 
-# Copy binaries from the extracted release and set permissions in one layer
-COPY ${BINARY_SOURCE}/* /output/usr/bin/
-RUN chmod +x /output/usr/bin/*
+# Copy the extracted release into a staging area, then keep only actual
+# executables in /usr/bin. Upstream tarballs commonly bundle docs, man
+# pages, and shell completions alongside the binary (e.g. ripgrep ships
+# 11 extra files - CHANGELOG, man page, 4 shell completions, licenses)
+# and blindly copying everything pollutes /usr/bin with non-executable
+# clutter, some of it left world-executable.
+COPY ${BINARY_SOURCE}/* /tmp/binary-source/
+RUN for f in /tmp/binary-source/*; do \
+        [ -f "$f" ] || continue; \
+        file -b "$f" | grep -q "^ELF " && cp "$f" /output/usr/bin/; \
+    done \
+    && chmod +x /output/usr/bin/* \
+    && rm -rf /tmp/binary-source
 
 # Copy package metadata files
 COPY output/DEBIAN/control /tmp/control.template
