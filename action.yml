@@ -123,6 +123,11 @@ runs:
         fi
         echo "Configuration file found: ${{ inputs.config-file }}"
 
+    - name: Set up QEMU for cross-architecture builds
+      uses: docker/setup-qemu-action@v3
+      with:
+        platforms: arm64,arm,i386,ppc64le,s390x,riscv64
+
     - name: Build packages
       id: build
       shell: bash
@@ -157,6 +162,14 @@ runs:
         if [ ! -d "./output" ]; then
           cp -r "$ACTION_PATH/templates/output" ./output
         fi
+
+        # Diagnostic: log docker/buildx state before builds so runner failures are visible
+        echo "--- docker info ---"
+        docker info --format '{{.ServerVersion}}' 2>&1 || echo "docker daemon unreachable"
+        echo "--- qemu/binfmt registrations ---"
+        ls /proc/sys/fs/binfmt_misc/ 2>/dev/null
+        echo "--- docker buildx version ---"
+        docker buildx version 2>&1 || echo "buildx unavailable"
 
         # Run the build
         ./build.sh "$CONFIG_FILE" "$VERSION" "$BUILD_VERSION" "$ARCHITECTURE"
