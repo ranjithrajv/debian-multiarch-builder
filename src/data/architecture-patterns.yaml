@@ -5,7 +5,11 @@
 architecture_patterns:
   amd64: "x86_64|amd64|x64"
   arm64: "aarch64|arm64"
-  armel: "arm-|armeabi"
+  # armel is Debian's soft-float ARM port. "eabi([^h]|$)" requires the abi
+  # suffix NOT be followed by "hf", so hard-float assets like
+  # arm-unknown-linux-gnueabihf/musleabihf (which belong to armhf) are
+  # excluded - matching them here would ship an ABI-incompatible binary.
+  armel: "armel|armeabi([^h]|$)|arm-.*eabi([^h]|$)"
   armhf: "armv7|armhf|arm-.*gnueabihf"
   i386: "i686|i386|x86"
   ppc64el: "powerpc64le|ppc64le"
