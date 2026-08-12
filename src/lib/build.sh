@@ -9,10 +9,15 @@ build_distribution() {
     local binary_source=$3
 
     # Debian policy requires the Version field to start with a digit, but
-    # upstream release tags commonly have a leading "v" (e.g. v0.64.0). The
-    # raw $VERSION (with any "v") is still used for the GitHub release
-    # lookup/download elsewhere - only the Debian-facing version drops it.
-    local debian_version="${VERSION#[vV]}"
+    # upstream release tags commonly have a non-digit prefix - not just a
+    # leading "v" (e.g. v0.64.0), but sometimes a project-name prefix too
+    # (e.g. bun's tags are "bun-v1.3.14"). Strip any leading run of
+    # non-digit characters rather than just a single "v"/"V". The raw
+    # $VERSION (with the original prefix) is still used for the GitHub
+    # release lookup/download elsewhere - only the Debian-facing version
+    # drops it.
+    local debian_version
+    debian_version=$(echo "$VERSION" | sed -E 's/^[^0-9]*//')
     FULL_VERSION="${debian_version}-${BUILD_VERSION}+${dist}_${build_arch}"
 
     # Docker build with failure capture
