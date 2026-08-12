@@ -134,10 +134,9 @@ When adding new configuration options:
 src/
 ├── lib/
 │   ├── logging.sh          # Logging and output formatting
-│   ├── config.sh           # Configuration parsing and validation
-│   ├── config-simple.sh    # Simplified configuration
+│   ├── config-simple.sh    # Configuration parsing and validation
 │   ├── github-api.sh       # GitHub API interactions
-│   ├── discovery.sh        # Architecture pattern discovery
+│   ├── discovery-simple.sh # Architecture pattern discovery
 │   ├── validation.sh       # Release and checksum validation
 │   ├── build.sh            # Core build functions
 │   ├── orchestration.sh    # Build orchestration (parallel and sequential)
