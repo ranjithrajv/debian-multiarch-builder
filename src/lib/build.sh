@@ -8,7 +8,12 @@ build_distribution() {
     local dist=$2
     local binary_source=$3
 
-    FULL_VERSION="${VERSION}-${BUILD_VERSION}+${dist}_${build_arch}"
+    # Debian policy requires the Version field to start with a digit, but
+    # upstream release tags commonly have a leading "v" (e.g. v0.64.0). The
+    # raw $VERSION (with any "v") is still used for the GitHub release
+    # lookup/download elsewhere - only the Debian-facing version drops it.
+    local debian_version="${VERSION#[vV]}"
+    FULL_VERSION="${debian_version}-${BUILD_VERSION}+${dist}_${build_arch}"
 
     # Docker build with failure capture
     local docker_build_log="/tmp/docker-build-${dist}-${build_arch}.log"
@@ -19,7 +24,7 @@ build_distribution() {
         --file "$SCRIPT_DIR/Dockerfile" \
         --build-arg DEBIAN_DIST="$dist" \
         --build-arg PACKAGE_NAME="$PACKAGE_NAME" \
-        --build-arg VERSION="$VERSION" \
+        --build-arg VERSION="$debian_version" \
         --build-arg BUILD_VERSION="$BUILD_VERSION" \
         --build-arg FULL_VERSION="$FULL_VERSION" \
         --build-arg ARCH="$build_arch" \
