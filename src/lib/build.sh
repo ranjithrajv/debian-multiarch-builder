@@ -81,17 +81,21 @@ build_distribution() {
             docker rm "$container_id" >/dev/null 2>&1 || true
         else
             docker rm "$container_id" >/dev/null 2>&1 || true
+            # Remove any empty/partial leftover so it cannot be counted or uploaded
+            rm -f "./${PACKAGE_NAME}_${FULL_VERSION}.deb"
             return 1
         fi
     else
         return 1
     fi
-    
+
     # Clean up Docker image to save space
     docker rmi "${PACKAGE_NAME}-${dist}-${build_arch}" 2>/dev/null || true
-    
+
     # Verify the .deb package was created and is non-empty
     if [ ! -s "./${PACKAGE_NAME}_${FULL_VERSION}.deb" ]; then
+        # Remove the empty file so it cannot be counted or uploaded as a package
+        rm -f "./${PACKAGE_NAME}_${FULL_VERSION}.deb"
         record_build_failure "package_extraction" "Generated .deb package is missing or empty: ./${PACKAGE_NAME}_${FULL_VERSION}.deb" "1" "$build_arch" "$dist"
         add_failure_detail "Package file not found or empty after build: ./${PACKAGE_NAME}_${FULL_VERSION}.deb"
         return 1
@@ -237,12 +241,17 @@ If binaries are in a subdirectory, add 'binary_path' to your config:
   binary_path: \"subdirectory/name\""
     fi
 
-    # Build packages for each Debian distribution IN PARALLEL
-    info "Building packages for all distributions in parallel..."
-
-    declare -a dist_pids=()
+    # Build each distribution for this architecture. Dist builds are run
+    # SEQUENTIALLY per architecture: architecture workers are already
+    # parallelized by the resource pool (up to MAX_PARALLEL), and
+    # backgrounding the distributions on top of that multiplied concurrent
+    # docker builds by the dist count (e.g. 3 workers x 4 dists = 12
+    # simultaneous builds), which exhausted shared CI runners and produced
+    # scattered failures. Serializing keeps peak docker concurrency at the
+    # resource-pool budget.
     declare -a dist_names=()
     local dist_count=0
+    local failed_dists=()
 
     for dist in $DISTRIBUTIONS; do
         # Skip bare '-' or 'null' tokens from yq formatting artifacts
@@ -254,20 +263,16 @@ If binaries are in a subdirectory, add 'binary_path' to your config:
         fi
 
         dist_count=$((dist_count + 1))
-        info "Starting build for $dist..."
-
-        # Build distribution in background
-        (
-            if build_distribution "$build_arch" "$dist" "$binary_source"; then
-                echo "SUCCESS" > "build_${build_arch}_${dist}.status"
-            else
-                echo "FAILED" > "build_${build_arch}_${dist}.status"
-                exit 1
-            fi
-        ) > "build_${build_arch}_${dist}.log" 2>&1 &
-
-        dist_pids+=($!)
         dist_names+=("$dist")
+        info "Building $dist for $build_arch..."
+
+        if build_distribution "$build_arch" "$dist" "$binary_source" > "build_${build_arch}_${dist}.log" 2>&1; then
+            success "Built ${PACKAGE_NAME} for $dist"
+        else
+            failed_dists+=("$dist")
+            echo "   ⚠️  $dist build failed - $build_arch will try other distributions"
+        fi
+        rm -f "build_${build_arch}_${dist}.status"
     done
 
     if [ $dist_count -eq 0 ]; then
@@ -275,25 +280,6 @@ If binaries are in a subdirectory, add 'binary_path' to your config:
         rm -rf "$extract_dir" || true
         return 0
     fi
-
-    # Wait for all distribution builds to complete
-    info "Waiting for $dist_count distribution builds to complete..."
-    local failed_dists=()
-
-    for i in "${!dist_pids[@]}"; do
-        pid=${dist_pids[$i]}
-        dist=${dist_names[$i]}
-
-        if wait $pid; then
-            success "Built ${PACKAGE_NAME} for $dist"
-        else
-            failed_dists+=("$dist")
-            echo "   ⚠️  $dist build failed - $build_arch will try other distributions"
-        fi
-
-        # Clean up status files
-        rm -f "build_${build_arch}_${dist}.status"
-    done
 
     # Display any failures with clearer context
     if [ ${#failed_dists[@]} -gt 0 ]; then
@@ -320,6 +306,13 @@ If binaries are in a subdirectory, add 'binary_path' to your config:
 
     # Clean up extracted directory
     rm -rf "$extract_dir" || true
+
+    # Propagate failure when every distribution build failed — otherwise the
+    # architecture is reported as successful even though it produced nothing
+    if [ ${#dist_names[@]} -gt 0 ] && [ ${#failed_dists[@]} -eq ${#dist_names[@]} ]; then
+        error_no_exit "All ${#dist_names[@]} distribution build(s) failed for $build_arch"
+        return 1
+    fi
 
     success "Successfully built for $build_arch ($dist_count packages)"
     return 0

@@ -308,13 +308,44 @@ if [ "$ARCH" = "all" ]; then
     for arch in "${ARCH_ARRAY[@]}"; do
         # Check if this architecture has release assets available
         # Use `if pattern=$(cmd)` form so set -e does not trigger on non-zero exit
-        if pattern=$(get_release_pattern "$arch" 2>/dev/null) && [ -n "$pattern" ]; then
+        if pattern=$(get_release_pattern "$arch" 2>/tmp/arch_detect_error.txt) && [ -n "$pattern" ]; then
             echo "$arch" >> /tmp/available_architectures.txt
             info "  ✓ $arch: Available"
         else
             info "  ✗ $arch: Not available (no matching release assets)"
+            # Surface the underlying cause once (e.g. GitHub API rate limit)
+            # instead of discarding stderr — hidden errors make every arch
+            # look "unavailable" and the failure impossible to diagnose.
+            if [ -s /tmp/arch_detect_error.txt ] && [ -z "${ARCH_DETECT_ERROR_SHOWN:-}" ]; then
+                ARCH_DETECT_ERROR_SHOWN=true
+                warning "First detection error (further repeats suppressed):"
+                sed 's/^/    /' /tmp/arch_detect_error.txt | head -10
+            fi
         fi
     done
+
+    # Restrict the build list to architectures with available release assets.
+    # Detection is authoritative: attempting unavailable architectures only
+    # produces failures and noise.
+    AVAILABLE_ARCH_ARRAY=()
+    while IFS= read -r avail_arch; do
+        [ -n "$avail_arch" ] && AVAILABLE_ARCH_ARRAY+=("$avail_arch")
+    done < /tmp/available_architectures.txt
+
+    if [ ${#AVAILABLE_ARCH_ARRAY[@]} -eq 0 ]; then
+        error "No release assets matched any configured architecture for $PACKAGE_NAME $VERSION.
+
+All $TOTAL_ARCHS configured architectures were detected as unavailable.
+This usually means the release asset patterns do not match any published
+assets, or the GitHub API could not be reached to enumerate them.
+
+Please check:
+  1. https://github.com/${GITHUB_REPO}/releases/tag/${VERSION}
+  2. The architecture patterns in your config (or auto-discovery settings)
+  3. GitHub API access and rate limits from this environment" "release_not_found"
+    fi
+
+    info "Building ${#AVAILABLE_ARCH_ARRAY[@]} available architectures (of $TOTAL_ARCHS configured): ${AVAILABLE_ARCH_ARRAY[*]}"
 
     BUILD_SUCCESS=false
     if [ "$PARALLEL_BUILDS" = "true" ]; then
@@ -341,7 +372,7 @@ if [ "$ARCH" = "all" ]; then
         export MAX_PARALLEL
 
         # Execute parallel builds with advanced resource pooling
-        if build_all_architectures_parallel "${ARCH_ARRAY[@]}"; then
+        if build_all_architectures_parallel "${AVAILABLE_ARCH_ARRAY[@]}"; then
             BUILD_SUCCESS=true
         else
             # Parallel build failed - check if any packages were generated
@@ -352,7 +383,7 @@ if [ "$ARCH" = "all" ]; then
         fi
     else
         # Sequential builds (original behavior)
-        if build_architecture_sequential "${ARCH_ARRAY[@]}"; then
+        if build_architecture_sequential "${AVAILABLE_ARCH_ARRAY[@]}"; then
             BUILD_SUCCESS=true
         fi
     fi

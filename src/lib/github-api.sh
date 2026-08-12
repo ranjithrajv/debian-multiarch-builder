@@ -10,15 +10,23 @@ mkdir -p "$API_CACHE_DIR"
 api_call_with_retry() {
     local url="$1"
 
-    # Use gh CLI if available — handles auth, rate limiting, and retries natively.
-    # gh is pre-installed on GitHub Actions ubuntu-latest runners.
+    # Use gh CLI when available AND authenticated — it handles auth, rate
+    # limiting, and retries natively. gh is pre-installed on GitHub Actions
+    # runners but is NOT authenticated unless GH_TOKEN/GITHUB_TOKEN is set,
+    # so verify before relying on it, and fall back to curl on any failure.
     if command -v gh &>/dev/null; then
-        local endpoint="${url#https://api.github.com/}"
-        gh api "$endpoint" 2>/dev/null
-        return $?
+        if [ -n "${GH_TOKEN:-}${GITHUB_TOKEN:-}" ] || gh auth status &>/dev/null; then
+            local endpoint="${url#https://api.github.com/}"
+            local gh_response
+            if gh_response=$(gh api "$endpoint" 2>/dev/null) && [ -n "$gh_response" ]; then
+                echo "$gh_response"
+                return 0
+            fi
+            warning "gh API call failed for $url - falling back to curl"
+        fi
     fi
 
-    # curl fallback for environments without gh CLI
+    # curl fallback for environments without (authenticated) gh CLI
     local max_retries=3
     local retry_delay=1
     local attempt=0
