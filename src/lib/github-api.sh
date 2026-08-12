@@ -220,6 +220,67 @@ fetch_release_data() {
     fi
 }
 
+# Reformat raw license text into Debian copyright-format continuation lines:
+# https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/ requires
+# every continuation line to start with a space, and blank lines within a
+# field's body to be a lone "." (otherwise a blank line ends the paragraph).
+format_license_text_for_copyright() {
+    local raw="$1"
+    if [ -z "$raw" ]; then
+        echo " No machine-readable license text could be detected upstream;"
+        echo " see the project's repository for licensing terms."
+        return 0
+    fi
+    echo "$raw" | sed 's/^$/./' | sed 's/^/ /'
+}
+
+# Fetch the upstream repo's detected license (SPDX id + full text) via the
+# GitHub API's /license endpoint. Populates LICENSE_SPDX and LICENSE_TEXT
+# (the latter already formatted for direct use in a copyright file's License
+# field body). Falls back to NOASSERTION/a manual-review note if GitHub can't
+# detect a license - many valid repos don't have a machine-detectable
+# LICENSE file, and that shouldn't fail the whole build.
+fetch_upstream_license() {
+    local cache_file="${API_CACHE_DIR}/license_${GITHUB_REPO//\//_}.cache"
+    local cache_meta="${cache_file}.meta"
+
+    if [ -f "$cache_file" ] && [ -f "$cache_meta" ]; then
+        local cache_time=$(cat "$cache_meta" 2>/dev/null || echo "0")
+        local current_time=$(date +%s)
+        # License rarely changes; cache for an hour like other stale-cache cleanup.
+        if [ $((current_time - cache_time)) -lt 3600 ]; then
+            LICENSE_SPDX=$(jq -r '.spdx_id' "$cache_file")
+            LICENSE_TEXT=$(format_license_text_for_copyright "$(jq -r '.text' "$cache_file")")
+            return 0
+        fi
+        rm -f "$cache_file" "$cache_meta" 2>/dev/null || true
+    fi
+
+    # Deliberately not routed through api_call_with_retry: GitHub returns 404
+    # for repos with no machine-detectable LICENSE file, which is a normal,
+    # non-fatal case here - api_call_with_retry treats any non-200 as a hard
+    # build failure after retries, which would be wrong for optional metadata.
+    local api_url="https://api.github.com/repos/${GITHUB_REPO}/license"
+    local response
+    response=$(curl -sL -H "Accept: application/vnd.github.v3+json" \
+        ${GITHUB_TOKEN:+-H "Authorization: token $GITHUB_TOKEN"} \
+        "$api_url" 2>/dev/null)
+
+    LICENSE_SPDX=$(echo "$response" | jq -r '.license.spdx_id // "NOASSERTION"' 2>/dev/null)
+    local raw_text
+    raw_text=$(echo "$response" | jq -r '.content // empty' 2>/dev/null | base64 -d 2>/dev/null)
+
+    if [ -z "$LICENSE_SPDX" ] || [ "$LICENSE_SPDX" = "null" ]; then
+        LICENSE_SPDX="NOASSERTION"
+    fi
+
+    jq -n --arg spdx "$LICENSE_SPDX" --arg text "$raw_text" \
+        '{spdx_id: $spdx, text: $text}' > "${cache_file}.tmp" && mv "${cache_file}.tmp" "$cache_file"
+    echo "$(date +%s)" > "$cache_meta"
+
+    LICENSE_TEXT=$(format_license_text_for_copyright "$raw_text")
+}
+
 # Function to cleanup API cache files
 cleanup_api_cache() {
     # Clean up current version cache files

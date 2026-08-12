@@ -215,6 +215,11 @@ fi
 # Parse and validate configuration
 parse_config "$CONFIG_FILE"
 
+# Fetch the upstream repo's license (once, not per-architecture) for the
+# copyright file. Best-effort: falls back to NOASSERTION if undetectable.
+fetch_upstream_license
+info "Detected upstream license: $LICENSE_SPDX"
+
 # If auto-detection was needed and we now have access to discovery functions
 if [ "$ARTIFACT_FORMAT_AUTO_DETECT_NEEDED" = "true" ]; then
     info "Performing artifact format auto-detection..."

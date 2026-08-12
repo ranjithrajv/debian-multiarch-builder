@@ -108,6 +108,7 @@ build_all_architectures_parallel() {
     # DISTRIBUTIONS) — without these the workers run with unset config and fail
     # architecture detection.
     export SCRIPT_DIR PACKAGE_NAME VERSION BUILD_VERSION GITHUB_REPO PACKAGE_DESCRIPTION
+    export LICENSE_SPDX LICENSE_TEXT
     export MAX_PARALLEL LINTIAN_CHECK TELEMETRY_ENABLED SAVE_BASELINE
     export ARCH CONFIG_FILE ACTION_PATH
     export AUTO_DISCOVERY ARTIFACT_FORMAT BINARY_PATH DISTRIBUTIONS 2>/dev/null || true

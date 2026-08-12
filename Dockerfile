@@ -13,6 +13,8 @@ ARG ARCH
 ARG BINARY_SOURCE
 ARG GITHUB_REPO
 ARG DESCRIPTION
+ARG LICENSE_SPDX
+ARG LICENSE_TEXT
 
 # Install necessary tools and cleanup in a single layer
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -37,7 +39,7 @@ RUN chmod +x /output/usr/bin/*
 
 # Copy package metadata files
 COPY output/DEBIAN/control /tmp/control.template
-COPY output/copyright /output/usr/share/doc/${PACKAGE_NAME}/
+COPY output/copyright /tmp/copyright.template
 COPY output/changelog.Debian /tmp/changelog.template
 
 # Copy README if it exists (optional)
@@ -54,8 +56,11 @@ RUN envsubst '${PACKAGE_NAME} ${VERSION} ${BUILD_VERSION} ${DIST} ${SUPPORTED_AR
 RUN envsubst '${PACKAGE_NAME} ${FULL_VERSION} ${DIST} ${VERSION}' \
         < /tmp/changelog.template | gzip -9 > "/output/usr/share/doc/${PACKAGE_NAME}/changelog.Debian.gz"
 
+RUN YEAR=$(date +%Y) envsubst '${PACKAGE_NAME} ${GITHUB_REPO} ${YEAR} ${LICENSE_SPDX} ${LICENSE_TEXT}' \
+        < /tmp/copyright.template > "/output/usr/share/doc/${PACKAGE_NAME}/copyright"
+
 # Cleanup temporary files
-RUN rm -f /tmp/control.template /tmp/changelog.template
+RUN rm -f /tmp/control.template /tmp/changelog.template /tmp/copyright.template
 
 # Build the .deb package
 RUN dpkg-deb --build /output "/${PACKAGE_NAME}_${FULL_VERSION}.deb"
