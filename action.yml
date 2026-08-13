@@ -121,9 +121,21 @@ runs:
         sudo apt-get update
         sudo apt-get install -y tar gzip jq curl lintian parallel dpkg-dev gettext-base
 
-        # Install mikefarah/yq (Go-based, not Python yq from apt)
+        # Install mikefarah/yq (Go-based, not Python yq from apt). The runner
+        # can be amd64 (ubuntu-latest) or arm64 (ubuntu-24.04-arm), so download
+        # the matching binary - a hardcoded amd64 build fails with "Exec format
+        # error" on native arm64 runners.
         YQ_VERSION="v4.48.1"
-        sudo curl -fsSL -o /usr/bin/yq "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64"
+        case "$(uname -m)" in
+          x86_64|amd64) YQ_ARCH="amd64" ;;
+          aarch64|arm64) YQ_ARCH="arm64" ;;
+          armv7l|armv6l) YQ_ARCH="arm" ;;
+          i386|i686) YQ_ARCH="386" ;;
+          ppc64le) YQ_ARCH="ppc64le" ;;
+          s390x) YQ_ARCH="s390x" ;;
+          *) echo "⚠️ Unknown runner arch $(uname -m); falling back to amd64 yq" >&2; YQ_ARCH="amd64" ;;
+        esac
+        sudo curl -fsSL -o /usr/bin/yq "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${YQ_ARCH}"
         sudo chmod +x /usr/bin/yq
 
     - name: Validate configuration
