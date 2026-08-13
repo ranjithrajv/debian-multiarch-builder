@@ -31,7 +31,7 @@ detect_github_repo() {
 # Fetch latest release version from GitHub
 fetch_latest_release() {
     local repo="$1"
-    local response=$(curl -s "https://api.github.com/repos/${repo}/releases/latest")
+    local response=$(curl -sL "https://api.github.com/repos/${repo}/releases/latest")
     local version=$(echo "$response" | jq -r '.tag_name // .name // empty' 2>/dev/null)
     
     if [ -n "$version" ] && [ "$version" != "null" ]; then
@@ -40,7 +40,7 @@ fetch_latest_release() {
     fi
     
     # Fallback: get latest tag
-    local tags=$(curl -s "https://api.github.com/repos/${repo}/tags?per_page=1" | jq -r '.[0].name // empty' 2>/dev/null)
+    local tags=$(curl -sL "https://api.github.com/repos/${repo}/tags?per_page=1" | jq -r '.[0].name // empty' 2>/dev/null)
     if [ -n "$tags" ] && [ "$tags" != "null" ]; then
         echo "$tags"
         return 0
@@ -55,11 +55,11 @@ detect_release_pattern() {
     local version="$2"
     
     # Fetch release assets
-    local assets=$(curl -s "https://api.github.com/repos/${repo}/releases/tags/${version}" | jq -r '.assets[].name' 2>/dev/null)
+    local assets=$(curl -sL "https://api.github.com/repos/${repo}/releases/tags/${version}" | jq -r '.assets[].name' 2>/dev/null)
     
     if [ -z "$assets" ]; then
         # Try latest release if version not found
-        assets=$(curl -s "https://api.github.com/repos/${repo}/releases/latest" | jq -r '.assets[].name' 2>/dev/null)
+        assets=$(curl -sL "https://api.github.com/repos/${repo}/releases/latest" | jq -r '.assets[].name' 2>/dev/null)
     fi
     
     if [ -z "$assets" ]; then
@@ -104,10 +104,10 @@ generate_architecture_map() {
     local repo="$1"
     local version="$2"
     
-    local assets=$(curl -s "https://api.github.com/repos/${repo}/releases/tags/${version}" | jq -r '.assets[].name' 2>/dev/null)
+    local assets=$(curl -sL "https://api.github.com/repos/${repo}/releases/tags/${version}" | jq -r '.assets[].name' 2>/dev/null)
     
     if [ -z "$assets" ]; then
-        assets=$(curl -s "https://api.github.com/repos/${repo}/releases/latest" | jq -r '.assets[].name' 2>/dev/null)
+        assets=$(curl -sL "https://api.github.com/repos/${repo}/releases/latest" | jq -r '.assets[].name' 2>/dev/null)
     fi
     
     local linux_assets=$(echo "$assets" | grep -iE "linux.*\.(tar\.gz|tgz|zip)$")
@@ -155,10 +155,10 @@ detect_pattern_format() {
     local repo="$1"
     local version="$2"
     
-    local assets=$(curl -s "https://api.github.com/repos/${repo}/releases/tags/${version}" | jq -r '.assets[].name' 2>/dev/null)
+    local assets=$(curl -sL "https://api.github.com/repos/${repo}/releases/tags/${version}" | jq -r '.assets[].name' 2>/dev/null)
     
     if [ -z "$assets" ]; then
-        assets=$(curl -s "https://api.github.com/repos/${repo}/releases/latest" | jq -r '.assets[].name' 2>/dev/null)
+        assets=$(curl -sL "https://api.github.com/repos/${repo}/releases/latest" | jq -r '.assets[].name' 2>/dev/null)
     fi
     
     local linux_asset=$(echo "$assets" | grep -iE "linux.*x86_64.*\.(tar\.gz|tgz|zip)$" | head -1)
@@ -228,8 +228,8 @@ generate_config() {
     fi
     
     # Get repo description for summary
-    local description=$(curl -s "https://api.github.com/repos/${repo}" | jq -r '.description // empty' 2>/dev/null)
-    local license=$(curl -s "https://api.github.com/repos/${repo}" | jq -r '.license.spdx_id // "Unknown"' 2>/dev/null)
+    local description=$(curl -sL "https://api.github.com/repos/${repo}" | jq -r '.description // empty' 2>/dev/null)
+    local license=$(curl -sL "https://api.github.com/repos/${repo}" | jq -r '.license.spdx_id // "Unknown"' 2>/dev/null)
     
     # Generate YAML configuration
     cat > "$output_file" << EOF

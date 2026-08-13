@@ -48,7 +48,7 @@ error() {
         "release_not_found")
             echo "" >&2
             echo -e "${YELLOW}💡 Solutions:${NC}" >&2
-            echo "   1. Verify the version exists: curl -s https://api.github.com/repos/\$repo/releases" >&2
+            echo "   1. Verify the version exists: curl -sL https://api.github.com/repos/\$repo/releases" >&2
             echo "   2. Check download_pattern in config matches release assets" >&2
             echo "   3. Run with --dry-run to diagnose" >&2
             echo "" >&2
@@ -173,7 +173,7 @@ error_with_cause() {
         "403")
             echo "" >&2
             echo -e "${BLUE}📋 API Rate Limit Info:${NC}" >&2
-            echo "   curl -s https://api.github.com/rate_limit" >&2
+            echo "   curl -sL https://api.github.com/rate_limit" >&2
             echo "" >&2
             echo "   Unauthenticated requests: 60/hour" >&2
             echo "   Set GITHUB_TOKEN for higher limits" >&2

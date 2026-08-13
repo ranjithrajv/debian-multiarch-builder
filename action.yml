@@ -85,7 +85,7 @@ runs:
 
           echo "🌐 Checking release: $RELEASE_URL"
 
-          if curl -s -f "${AUTH_HEADER[@]}" -o /dev/null -w "%{http_code}" "$RELEASE_URL" | grep -q "^200$"; then
+          if curl -s -fL "${AUTH_HEADER[@]}" -o /dev/null -w "%{http_code}" "$RELEASE_URL" | grep -q "^200$"; then
             echo "✅ Version ${{ inputs.version }} exists and is accessible"
           else
             echo "❌ Version ${{ inputs.version }} does not exist or is not accessible!"
@@ -93,7 +93,7 @@ runs:
             echo "📦 Latest available versions for $GITHUB_REPO:"
 
             # Get latest 3 versions for suggestion
-            LATEST_VERSIONS=$(curl -s "${AUTH_HEADER[@]}" "https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=3" | grep -o '"tag_name": *"[^"]*"' | sed 's/"tag_name": *"\([^"]*\)"/\1/' 2>/dev/null || echo "Could not fetch versions")
+            LATEST_VERSIONS=$(curl -sL "${AUTH_HEADER[@]}" "https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=3" | grep -o '"tag_name": *"[^"]*"' | sed 's/"tag_name": *"\([^"]*\)"/\1/' 2>/dev/null || echo "Could not fetch versions")
 
             if [ -n "$LATEST_VERSIONS" ] && [ "$LATEST_VERSIONS" != "Could not fetch versions" ]; then
               echo "$LATEST_VERSIONS" | while read -r version; do

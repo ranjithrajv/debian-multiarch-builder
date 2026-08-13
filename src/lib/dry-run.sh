@@ -109,13 +109,13 @@ run_dry_run() {
     # Step 3: Validate version exists
     echo "📋 Step 3/5: Checking version availability..."
     local release_url="https://api.github.com/repos/${github_repo}/releases/tags/${version}"
-    local http_code=$(curl -s -o /dev/null -w "%{http_code}" "$release_url")
+    local http_code=$(curl -sL -o /dev/null -w "%{http_code}" "$release_url")
 
     if [ "$http_code" = "200" ]; then
         success "Version $version exists"
         
         # Get release date
-        local release_date=$(curl -s "$release_url" | jq -r '.published_at // "unknown"' 2>/dev/null)
+        local release_date=$(curl -sL "$release_url" | jq -r '.published_at // "unknown"' 2>/dev/null)
         if [ "$release_date" != "null" ] && [ -n "$release_date" ]; then
             info "Published: $release_date"
         fi
@@ -131,7 +131,7 @@ run_dry_run() {
         
         # Try to suggest similar versions
         echo "🔍 Fetching available versions..."
-        local releases_response=$(curl -s "https://api.github.com/repos/${github_repo}/releases?per_page=10")
+        local releases_response=$(curl -sL "https://api.github.com/repos/${github_repo}/releases?per_page=10")
         local available_versions=$(echo "$releases_response" | jq -r '.[].tag_name' 2>/dev/null | head -5)
         
         if [ -n "$available_versions" ]; then
@@ -154,7 +154,7 @@ run_dry_run() {
     # Step 4: Check release assets for target architectures
     echo "📋 Step 4/5: Checking release assets..."
     local assets_url="https://api.github.com/repos/${github_repo}/releases/tags/${version}"
-    local release_assets=$(curl -s "$assets_url" | jq -r '.assets[].name' 2>/dev/null)
+    local release_assets=$(curl -sL "$assets_url" | jq -r '.assets[].name' 2>/dev/null)
 
     if [ -z "$release_assets" ]; then
         warning "No release assets found for version $version"
