@@ -110,6 +110,10 @@ build_source_package() {
         return 1
     fi
     rm -rf "$tree_dir/DEBIAN"
+    # The binary package's usr/share/doc is Debian packaging output (per-dist
+    # changelog.Debian.gz/copyright), not upstream payload. Exclude it from the
+    # source tree so the shared .orig.tar.xz compares cleanly for every dist.
+    rm -rf "$tree_dir/usr/share/doc"
 
     # debian/control
     DESCRIPTION="$PACKAGE_DESCRIPTION" \
