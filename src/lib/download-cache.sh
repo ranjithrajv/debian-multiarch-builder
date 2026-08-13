@@ -154,28 +154,3 @@ download_release_asset() {
     
     download_with_cache "$download_url" "$output_file" "$expected_checksum"
 }
-
-# Function to cleanup stale download cache
-cleanup_download_cache() {
-    if [ -d "$DOWNLOAD_CACHE_DIR" ]; then
-        # Remove cache files older than 7 days
-        find "$DOWNLOAD_CACHE_DIR" -type f -mtime +7 -delete 2>/dev/null || true
-        # Remove corrupted cache files
-        find "$DOWNLOAD_CACHE_DIR" -name "*.tmp" -type f -mmin +60 -delete 2>/dev/null || true
-        find "$DOWNLOAD_CACHE_DIR" -name "*.lock" -type f -mmin +5 -delete 2>/dev/null || true
-        
-        # Remove empty directory
-        rmdir "$DOWNLOAD_CACHE_DIR" 2>/dev/null || true
-    fi
-}
-
-# Function to get cache statistics
-get_download_cache_stats() {
-    if [ -d "$DOWNLOAD_CACHE_DIR" ]; then
-        local cache_size=$(du -sh "$DOWNLOAD_CACHE_DIR" 2>/dev/null | cut -f1 || echo "0")
-        local cache_files=$(find "$DOWNLOAD_CACHE_DIR" -name "*.cache" -type f | wc -l)
-        echo "Cache: $cache_files files, $cache_size"
-    else
-        echo "Cache: empty"
-    fi
-}

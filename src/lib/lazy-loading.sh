@@ -86,7 +86,6 @@ load_essential_libraries() {
     local essential_libs=(
         "logging"          # Required for all output
         "essential-utils"  # Core utilities
-        "file-utils"       # File operations
     )
     
     for lib in "${essential_libs[@]}"; do
