@@ -36,6 +36,14 @@ parse_config() {
     if [ "$PACKAGE_DESCRIPTION" = "null" ] || [ -z "$PACKAGE_DESCRIPTION" ]; then
         PACKAGE_DESCRIPTION="${PACKAGE_NAME}, packaged from ${GITHUB_REPO}"
     fi
+
+    # Maintainer for the Debian control/changelog metadata. Falls back to a
+    # generic identity (rather than the templates' literal placeholder text)
+    # when the package file does not set one.
+    PACKAGE_MAINTAINER=$(yq eval '.maintainer // ""' "$package_file")
+    if [ "$PACKAGE_MAINTAINER" = "null" ] || [ -z "$PACKAGE_MAINTAINER" ]; then
+        PACKAGE_MAINTAINER="latest-debs maintainers <maintainers@latest-debs.org>"
+    fi
     
     # Simple parallel build configuration
     MAX_PARALLEL="${MAX_PARALLEL:-2}"

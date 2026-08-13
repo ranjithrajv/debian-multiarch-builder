@@ -1,6 +1,6 @@
 Section: utils
 Priority: optional
-Maintainer: Your Name <your.email@example.com>
+Maintainer: ${MAINTAINER}
 Homepage: https://github.com/${GITHUB_REPO}
 Package: ${PACKAGE_NAME}
 Version: ${VERSION}-${BUILD_VERSION}+${DIST}

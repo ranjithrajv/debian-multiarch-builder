@@ -37,6 +37,7 @@ build_distribution() {
         --build-arg BINARY_RENAME="$BINARY_RENAME" \
         --build-arg GITHUB_REPO="$GITHUB_REPO" \
         --build-arg DESCRIPTION="$PACKAGE_DESCRIPTION" \
+        --build-arg MAINTAINER="$PACKAGE_MAINTAINER" \
         --build-arg LICENSE_SPDX="$LICENSE_SPDX" \
         --build-arg LICENSE_TEXT="$LICENSE_TEXT" \
         . 2>&1 | tee "$docker_build_log"

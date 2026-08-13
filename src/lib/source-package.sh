@@ -116,8 +116,8 @@ build_source_package() {
     rm -rf "$tree_dir/usr/share/doc"
 
     # debian/control
-    DESCRIPTION="$PACKAGE_DESCRIPTION" \
-    envsubst '${PACKAGE_NAME} ${GITHUB_REPO} ${DESCRIPTION}' \
+    DESCRIPTION="$PACKAGE_DESCRIPTION" MAINTAINER="$PACKAGE_MAINTAINER" \
+    envsubst '${PACKAGE_NAME} ${GITHUB_REPO} ${DESCRIPTION} ${MAINTAINER}' \
         < "$src_templates/control" > "$tree_dir/debian/control"
 
     # debian/rules
@@ -125,8 +125,8 @@ build_source_package() {
     chmod +x "$tree_dir/debian/rules"
 
     # debian/changelog
-    SRC_VERSION="$src_version" DIST="$dist" VERSION="$debian_version" \
-    envsubst '${PACKAGE_NAME} ${SRC_VERSION} ${DIST} ${VERSION}' \
+    SRC_VERSION="$src_version" DIST="$dist" VERSION="$debian_version" MAINTAINER="$PACKAGE_MAINTAINER" \
+    envsubst '${PACKAGE_NAME} ${SRC_VERSION} ${DIST} ${VERSION} ${MAINTAINER}' \
         < "$src_templates/changelog" > "$tree_dir/debian/changelog"
 
     # debian/copyright (reuse the binary package's copyright template)

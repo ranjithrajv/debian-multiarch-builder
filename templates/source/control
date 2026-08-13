@@ -1,7 +1,7 @@
 Source: ${PACKAGE_NAME}
 Section: utils
 Priority: optional
-Maintainer: Your Name <your.email@example.com>
+Maintainer: ${MAINTAINER}
 Homepage: https://github.com/${GITHUB_REPO}
 Standards-Version: 4.6.2
 Build-Depends: debhelper-compat (= 13)
