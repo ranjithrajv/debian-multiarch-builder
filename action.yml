@@ -36,6 +36,10 @@ inputs:
     description: 'Save current build metrics as performance baseline for regression detection'
     required: false
     default: 'false'
+  pinned-metadata:
+    description: 'Path to a release-metadata.json provenance pin (captured at vet time). When set and the release matches the vetted version, downloaded upstream assets are verified against the pinned SHA-256 and a mismatch fails the build.'
+    required: false
+    default: ''
   
 outputs:
   packages:
@@ -148,6 +152,7 @@ runs:
         LINTIAN_CHECK: ${{ inputs.lintian-check }}
         TELEMETRY_ENABLED: ${{ inputs.telemetry-enabled }}
         SAVE_BASELINE: ${{ inputs.save-baseline }}
+        PINNED_METADATA: ${{ inputs.pinned-metadata }}
         ACTION_PATH: ${{ github.action_path }}
       run: |
         echo "Starting multi-architecture build..."

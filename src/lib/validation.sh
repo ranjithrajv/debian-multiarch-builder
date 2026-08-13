@@ -14,6 +14,33 @@ validate_release() {
     return 0
 }
 
+# Read the vet-time provenance pin (release-metadata.json, path in
+# PINNED_METADATA) and echo the pinned SHA-256 when it covers exactly this
+# release tag + asset. Returns 0 with the hash when the pin applies;
+# returns 1 when there is no pin, the file is missing, or the pin covers a
+# different release/asset.
+#
+# This is the supply-chain anchor: the digest was recorded under human
+# review at vet time, so a release that was altered after vetting - asset
+# AND its own checksum file replaced together - is still caught here.
+fetch_pinned_checksum() {
+    local version="$1" release_pattern="$2"
+    local meta="${PINNED_METADATA:-}"
+    [ -n "$meta" ] && [ -f "$meta" ] || return 1
+    command -v jq >/dev/null 2>&1 || return 1
+
+    local pin_version pin_asset pin_sha
+    pin_version=$(jq -r '.version // empty' "$meta" 2>/dev/null || true)
+    pin_asset=$(jq -r '.asset // empty' "$meta" 2>/dev/null || true)
+    pin_sha=$(jq -r '.sha256 // empty' "$meta" 2>/dev/null || true)
+
+    [ -n "$pin_version" ] && [ "$pin_version" = "$version" ] || return 1
+    [ -n "$pin_asset" ] && [ "$pin_asset" = "$release_pattern" ] || return 1
+    [[ "$pin_sha" =~ ^[a-f0-9]{64}$ ]] || return 1
+
+    echo "$pin_sha"
+}
+
 # Function to verify checksum of downloaded file
 verify_checksum() {
     local archive_name=$1

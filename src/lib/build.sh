@@ -161,9 +161,24 @@ build_architecture() {
     # Download the release artifact with caching
     info "Preparing to download: $release_pattern"
     
-    # Get expected checksum if available
+    # Get expected checksum if available. Prefer the vet-time provenance pin
+    # over the release's live checksum file: the pin was recorded under
+    # human review at vet time, so an upstream release that was altered
+    # afterwards (asset AND its own checksum file replaced together) is
+    # still caught. A matching pin is enforced strictly - download_with_cache
+    # hard-fails on mismatch.
     local expected_checksum=""
-    if command -v fetch_checksum_for_asset >/dev/null 2>&1; then
+    if command -v fetch_pinned_checksum >/dev/null 2>&1; then
+        local pinned
+        pinned=$(fetch_pinned_checksum "$VERSION" "$release_pattern" 2>/dev/null || echo "")
+        if [ -n "$pinned" ]; then
+            expected_checksum="$pinned"
+            info "Provenance: $release_pattern verified against vetted pin (sha256:$pinned, recorded at vet time)"
+        else
+            info "Provenance: no vetted pin for $release_pattern @ $VERSION; falling back to live checksum verification"
+        fi
+    fi
+    if [ -z "$expected_checksum" ] && command -v fetch_checksum_for_asset >/dev/null 2>&1; then
         expected_checksum=$(fetch_checksum_for_asset "$release_pattern" 2>/dev/null || echo "")
     fi
     
