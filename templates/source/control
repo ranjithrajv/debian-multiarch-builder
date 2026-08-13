@@ -1,0 +1,12 @@
+Source: ${PACKAGE_NAME}
+Section: utils
+Priority: optional
+Maintainer: Your Name <your.email@example.com>
+Homepage: https://github.com/${GITHUB_REPO}
+Standards-Version: 4.6.2
+Build-Depends: debhelper-compat (= 13)
+
+Package: ${PACKAGE_NAME}
+Architecture: any
+Description: ${DESCRIPTION}
+ Packaged from the upstream GitHub release for Debian.

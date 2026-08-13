@@ -597,6 +597,11 @@ else
     fi
 fi
 
+# Generate Debian source packages (.dsc + .debian.tar.xz + shared .orig.tar.xz)
+# from the built binary packages, once per distribution. Best-effort: binary
+# builds stand on their own if this fails.
+build_source_packages
+
 # Finalize telemetry collection (success cases already recorded stage completion)
 finalize_telemetry
 

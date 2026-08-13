@@ -115,7 +115,7 @@ runs:
       shell: bash
       run: |
         sudo apt-get update
-        sudo apt-get install -y tar gzip jq curl lintian parallel
+        sudo apt-get install -y tar gzip jq curl lintian parallel dpkg-dev gettext-base
 
         # Install mikefarah/yq (Go-based, not Python yq from apt)
         YQ_VERSION="v4.48.1"
@@ -186,3 +186,5 @@ runs:
         PACKAGES=$(ls *.deb 2>/dev/null | tr '\n' ' ' || echo "")
         echo "packages=$PACKAGES" >> $GITHUB_OUTPUT
         echo "Generated packages: $PACKAGES"
+        SOURCE_PACKAGES=$(ls *.dsc 2>/dev/null | tr '\n' ' ' || echo "")
+        echo "Generated source packages: $SOURCE_PACKAGES"
