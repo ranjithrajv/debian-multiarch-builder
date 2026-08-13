@@ -23,19 +23,32 @@ validate_release() {
 # This is the supply-chain anchor: the digest was recorded under human
 # review at vet time, so a release that was altered after vetting - asset
 # AND its own checksum file replaced together - is still caught here.
+#
+# Two pin layouts are supported:
+#   * modern: an "assets" map keyed by asset name, so EVERY per-arch asset
+#     the builder downloads is pinned (not just the primary);
+#   * legacy: a single top-level "asset"/"sha256" pair.
 fetch_pinned_checksum() {
     local version="$1" release_pattern="$2"
     local meta="${PINNED_METADATA:-}"
     [ -n "$meta" ] && [ -f "$meta" ] || return 1
     command -v jq >/dev/null 2>&1 || return 1
 
-    local pin_version pin_asset pin_sha
+    local pin_version
     pin_version=$(jq -r '.version // empty' "$meta" 2>/dev/null || true)
-    pin_asset=$(jq -r '.asset // empty' "$meta" 2>/dev/null || true)
-    pin_sha=$(jq -r '.sha256 // empty' "$meta" 2>/dev/null || true)
-
     [ -n "$pin_version" ] && [ "$pin_version" = "$version" ] || return 1
-    [ -n "$pin_asset" ] && [ "$pin_asset" = "$release_pattern" ] || return 1
+
+    local pin_sha=""
+    # Modern layout: per-asset pin map covering every arch's asset.
+    pin_sha=$(jq -r --arg a "$release_pattern" '.assets[$a].sha256 // empty' "$meta" 2>/dev/null || true)
+    if [ -z "$pin_sha" ]; then
+        # Legacy layout: single primary asset.
+        local pin_asset
+        pin_asset=$(jq -r '.asset // empty' "$meta" 2>/dev/null || true)
+        [ -n "$pin_asset" ] && [ "$pin_asset" = "$release_pattern" ] || return 1
+        pin_sha=$(jq -r '.sha256 // empty' "$meta" 2>/dev/null || true)
+    fi
+
     [[ "$pin_sha" =~ ^[a-f0-9]{64}$ ]] || return 1
 
     echo "$pin_sha"
