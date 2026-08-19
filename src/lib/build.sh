@@ -35,6 +35,7 @@ build_distribution() {
         --build-arg ARCH="$build_arch" \
         --build-arg BINARY_SOURCE="$binary_source" \
         --build-arg BINARY_RENAME="$BINARY_RENAME" \
+        --build-arg BUNDLE="$BUNDLE" \
         --build-arg GITHUB_REPO="$GITHUB_REPO" \
         --build-arg DESCRIPTION="$PACKAGE_DESCRIPTION" \
         --build-arg MAINTAINER="$PACKAGE_MAINTAINER" \

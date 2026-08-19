@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - Marketplace Publish Prep
+
+### Added
+- **Validation CI workflow** (`.github/workflows/ci.yml`) that gates every push and PR:
+  - `actionlint` linting of all workflow files
+  - `shellcheck` at error severity across all shell scripts
+  - YAML parse-check of every tracked `.yml`/`.yaml` file
+  - Functional dry-run smoke tests of the demo and example configs
+
+### Changed
+- **README action inputs table** now matches `action.yml`: added `pinned-metadata`,
+  corrected the `max-parallel` default from `2` to `4`
+- **Docs** `quick-start-guide.md` and `configuration-reference.md` now state the
+  `max-parallel` default as `4`
+- **Security guide** gained a Provenance Pinning (`pinned-metadata`) section
+  documenting the modern per-asset and legacy pin layouts
+
+## [v.0.1a16] - 2026-08-19
+
+### Added
+- **`bundle` package.yaml option** for upstreams that ship a full install tree
+  (bin/lib/libexec/share) instead of standalone binaries - e.g.
+  zed-industries/zed, whose launcher's `$ORIGIN`-relative RPATH only resolves
+  correctly if the tree stays intact. When set, the whole `binary_path`
+  directory installs under `/usr/lib/<package>/` and any ELF executables
+  found in its `bin/` subdirectory are symlinked into `/usr/bin/`.
+
+### Fixed
+- **Checksum verification matched the wrong asset's checksum file** for
+  releases that publish one checksum file per platform without an exact
+  `<archive>.sha256sum` name match (e.g. zellij-org/zellij, whose checksum
+  files omit the archive's own extension). The unscoped fallback search
+  applied the first alphabetically-matching checksum file to every
+  architecture being verified - e.g. a macOS build's hash silently checked
+  against Linux downloads - failing every build with a bogus mismatch.
+  `verify_checksum` and `fetch_checksum_for_asset` now also try the
+  archive's extension-stripped stem, and the fallback search is scoped to
+  checksum files whose name actually contains that stem.
+
 ## [v.0.1a4] - 2026-02-27
 
 ### Fixed - Critical Bug Fixes

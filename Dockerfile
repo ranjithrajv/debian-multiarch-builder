@@ -12,6 +12,7 @@ ARG FULL_VERSION
 ARG ARCH
 ARG BINARY_SOURCE
 ARG BINARY_RENAME
+ARG BUNDLE
 ARG GITHUB_REPO
 ARG DESCRIPTION
 ARG LICENSE_SPDX
@@ -35,19 +36,59 @@ RUN mkdir -p /output/usr/bin \
     && mkdir -p "/output/usr/share/doc/${PACKAGE_NAME}" \
     && mkdir -p /output/DEBIAN
 
-# Copy the extracted release into a staging area, then keep only actual
-# executables in /usr/bin. Upstream tarballs commonly bundle docs, man
-# pages, and shell completions alongside the binary (e.g. ripgrep ships
-# 11 extra files - CHANGELOG, man page, 4 shell completions, licenses)
-# and blindly copying everything pollutes /usr/bin with non-executable
-# clutter, some of it left world-executable.
+# Copy the extracted release into a staging area, then either (a) keep only
+# actual executables in /usr/bin - the default - or (b) for BUNDLE=true
+# packages, install the whole tree intact under /usr/lib/<package>/ and
+# symlink its bin/ executables into /usr/bin.
+#
+# (a) Upstream tarballs commonly bundle docs, man pages, and shell
+# completions alongside the binary (e.g. ripgrep ships 11 extra files -
+# CHANGELOG, man page, 4 shell completions, licenses) and blindly copying
+# everything pollutes /usr/bin with non-executable clutter, some of it left
+# world-executable.
+#
+# (b) Some upstreams ship a full install tree instead - e.g.
+# zed-industries/zed's zed.app/{bin,lib,libexec,share} - where bin/zed's
+# RPATH is $ORIGIN-relative (../lib, ../libexec/zed-editor) and only
+# resolves correctly if bin/, lib/, and libexec/ stay siblings on disk.
+# Flattening top-level files (case a) would drop lib/libexec entirely and
+# leave the binary unable to find its shared libraries. $ORIGIN is resolved
+# from the executable's real (symlink-followed) path, so a /usr/bin symlink
+# into /usr/lib/<package>/bin/ works correctly here.
+# Two COPY forms are needed because Docker treats them differently: the
+# glob form (used by the non-bundle branch) merges each matched entry's
+# *contents* into the destination independently, flattening away any
+# subdirectory name (bin/, lib/, libexec/ would all collapse together) -
+# fine for the non-bundle case, which only wants top-level files anyway.
+# The non-glob single-directory form instead preserves one level of nested
+# structure, which BUNDLE mode needs to keep bin/, lib/, and libexec/
+# intact as siblings.
 COPY ${BINARY_SOURCE}/* /tmp/binary-source/
-RUN for f in /tmp/binary-source/*; do \
-        [ -f "$f" ] || continue; \
-        file -b "$f" | grep -q "^ELF " && cp "$f" /output/usr/bin/ || true; \
-    done \
-    && chmod +x /output/usr/bin/* \
-    && rm -rf /tmp/binary-source
+COPY ${BINARY_SOURCE} /tmp/binary-bundle
+RUN if [ "$BUNDLE" = "true" ]; then \
+        rm -rf /tmp/binary-source \
+        && mkdir -p "/output/usr/lib/${PACKAGE_NAME}" \
+        && cp -a /tmp/binary-bundle/. "/output/usr/lib/${PACKAGE_NAME}/" \
+        && rm -rf /tmp/binary-bundle \
+        && if [ -d "/output/usr/lib/${PACKAGE_NAME}/bin" ]; then \
+               for f in "/output/usr/lib/${PACKAGE_NAME}/bin/"*; do \
+                   [ -f "$f" ] || continue; \
+                   file -b "$f" | grep -q "^ELF " || continue; \
+                   chmod +x "$f"; \
+                   ln -s "/usr/lib/${PACKAGE_NAME}/bin/$(basename "$f")" "/output/usr/bin/$(basename "$f")"; \
+               done; \
+           fi; \
+    else \
+        rm -rf /tmp/binary-bundle; \
+        for f in /tmp/binary-source/*; do \
+            [ -f "$f" ] || continue; \
+            file -b "$f" | grep -q "^ELF " && cp "$f" /output/usr/bin/ || true; \
+        done \
+        && chmod +x /output/usr/bin/* \
+        && rm -rf /tmp/binary-source; \
+    fi \
+    && [ -n "$(ls -A /output/usr/bin 2>/dev/null)" ] || \
+       (echo "ERROR: no executables landed in /usr/bin (BUNDLE=$BUNDLE, BINARY_SOURCE=$BINARY_SOURCE) - check binary_path/bundle config" >&2; exit 1)
 
 # Some upstreams embed the OS/arch suffix directly in the binary's own
 # filename inside the release archive (e.g. mikefarah/yq ships

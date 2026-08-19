@@ -29,6 +29,15 @@ parse_config() {
     # would otherwise install an unrunnable, oddly-named executable.
     BINARY_RENAME=$(yq eval '.binary_rename // ""' "$package_file")
 
+    # Some upstreams ship a full install tree instead of standalone binaries
+    # (e.g. zed-industries/zed's zed.app/{bin,lib,libexec,share}, where the
+    # launcher's RPATH is $ORIGIN-relative and depends on the tree staying
+    # intact). When bundle is true, the whole binary_path directory is
+    # installed under /usr/lib/<package_name>/ instead of flattening its
+    # top-level files into /usr/bin, and any ELF executables found directly
+    # under its bin/ subdirectory are symlinked into /usr/bin.
+    BUNDLE=$(yq eval '.bundle // "false"' "$package_file")
+
     # Short package description for the control file's Description synopsis.
     # Falls back to a minimal but accurate description (rather than the
     # control template's literal placeholder text) when not configured.

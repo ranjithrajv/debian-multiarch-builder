@@ -62,19 +62,44 @@ verify_checksum() {
     # Try to find checksum file in release assets
     local assets=$(fetch_release_assets)
 
+    # Some upstreams (e.g. zellij-org/zellij) publish one checksum file per
+    # asset, named after the archive WITHOUT its own extension - i.e.
+    # "zellij-aarch64-unknown-linux-musl.sha256sum", not
+    # "zellij-aarch64-unknown-linux-musl.tar.gz.sha256sum". Build that
+    # alternate stem alongside the exact-with-extension patterns below.
+    local stem="$release_pattern"
+    case "$stem" in
+        *.tar.gz) stem="${stem%.tar.gz}" ;;
+        *.tgz) stem="${stem%.tgz}" ;;
+        *.zip) stem="${stem%.zip}" ;;
+    esac
+
     # Look for common checksum file patterns
     local checksum_file=""
-    for pattern in "${release_pattern}.sha256" "${release_pattern}.sha256sum" "SHA256SUMS" "checksums.txt"; do
+    for pattern in "${release_pattern}.sha256" "${release_pattern}.sha256sum" \
+                   "${stem}.sha256" "${stem}.sha256sum" \
+                   "SHA256SUMS" "checksums.txt"; do
         if echo "$assets" | grep -qi "^${pattern}$"; then
             checksum_file="$pattern"
             break
         fi
     done
 
-    # Also try generic patterns that might contain our file
+    # Generic fallback: only consider checksum-like files whose name is
+    # actually scoped to THIS asset (contains its own stem). A release that
+    # publishes one checksum file per platform (e.g. zellij ships
+    # zellij-aarch64-apple-darwin.sha256sum alongside
+    # zellij-aarch64-unknown-linux-musl.sha256sum, neither matching the
+    # exact patterns above) would otherwise have grep's first alphabetical
+    # match applied unconditionally to every architecture being verified -
+    # silently checking Linux downloads against a macOS asset's hash and
+    # failing every build with a bogus "checksum mismatch". Requiring the
+    # candidate to contain our own stem keeps the match scoped to this
+    # asset; if nothing matches, verification is skipped (same as "no
+    # checksum file found") rather than guessing.
     if [ -z "$checksum_file" ]; then
         for pattern in "sha256" "checksums" "sums"; do
-            local found=$(echo "$assets" | grep -i "$pattern" | grep -v "sig$" | head -1)
+            local found=$(echo "$assets" | grep -i "$pattern" | grep -v "sig$" | grep -iF "$stem" | head -1)
             if [ -n "$found" ]; then
                 checksum_file="$found"
                 break
@@ -185,9 +210,21 @@ resolve_multialgo_checksum() {
 fetch_checksum_for_asset() {
     local asset_name="$1"
     local assets=$(fetch_release_assets)
-    
+
+    # See the matching comment in verify_checksum(): some upstreams name
+    # their per-asset checksum file after the archive's stem, without its
+    # own extension.
+    local asset_stem="$asset_name"
+    case "$asset_stem" in
+        *.tar.gz) asset_stem="${asset_stem%.tar.gz}" ;;
+        *.tgz) asset_stem="${asset_stem%.tgz}" ;;
+        *.zip) asset_stem="${asset_stem%.zip}" ;;
+    esac
+
     # Try to find checksum file in release assets
-    local checksum_patterns=("${asset_name}.sha256" "${asset_name}.sha256sum" "SHA256SUMS" "checksums.txt")
+    local checksum_patterns=("${asset_name}.sha256" "${asset_name}.sha256sum" \
+                              "${asset_stem}.sha256" "${asset_stem}.sha256sum" \
+                              "SHA256SUMS" "checksums.txt")
     local checksum_file=""
     
     for pattern in "${checksum_patterns[@]}"; do
