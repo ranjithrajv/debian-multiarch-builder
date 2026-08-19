@@ -56,15 +56,17 @@ RUN mkdir -p /output/usr/bin \
 # leave the binary unable to find its shared libraries. $ORIGIN is resolved
 # from the executable's real (symlink-followed) path, so a /usr/bin symlink
 # into /usr/lib/<package>/bin/ works correctly here.
-# Two COPY forms are needed because Docker treats them differently: the
-# glob form (used by the non-bundle branch) merges each matched entry's
-# *contents* into the destination independently, flattening away any
-# subdirectory name (bin/, lib/, libexec/ would all collapse together) -
-# fine for the non-bundle case, which only wants top-level files anyway.
-# The non-glob single-directory form instead preserves one level of nested
-# structure, which BUNDLE mode needs to keep bin/, lib/, and libexec/
-# intact as siblings.
-COPY ${BINARY_SOURCE}/* /tmp/binary-source/
+#
+# A single non-glob COPY (preserving the tree's own structure, not Docker's
+# glob-COPY semantics of merging each matched entry's *contents* into the
+# destination independently) feeds both branches below. The glob form used
+# to feed the non-bundle branch separately, but Docker's glob-merge collides
+# whenever two top-level subdirectories share a same-named entry one level
+# down - e.g. neovim/neovim's release has both bin/nvim (a file) and
+# lib/nvim/ (a directory), and merging both into /tmp/binary-source/nvim
+# fails outright with "cannot copy to non-directory" before the bundle-mode
+# branching below is even reached. Deriving file-only iteration in the
+# non-bundle branch from this same safe copy sidesteps that entirely.
 COPY ${BINARY_SOURCE} /tmp/binary-bundle
 # Bundle-mode executable discovery covers two shapes: a bin/ subdirectory
 # (zed.app/{bin,lib,libexec,share}, an FHS-like tree), and executables
@@ -73,10 +75,8 @@ COPY ${BINARY_SOURCE} /tmp/binary-bundle
 # own dist/ alongside it, with no bin/lib/libexec structure at all). Check
 # both rather than requiring upstream's layout to match one specific shape.
 RUN if [ "$BUNDLE" = "true" ]; then \
-        rm -rf /tmp/binary-source \
-        && mkdir -p "/output/usr/lib/${PACKAGE_NAME}" \
+        mkdir -p "/output/usr/lib/${PACKAGE_NAME}" \
         && cp -a /tmp/binary-bundle/. "/output/usr/lib/${PACKAGE_NAME}/" \
-        && rm -rf /tmp/binary-bundle \
         && if [ -d "/output/usr/lib/${PACKAGE_NAME}/bin" ]; then \
                for f in "/output/usr/lib/${PACKAGE_NAME}/bin/"*; do \
                    [ -f "$f" ] || continue; \
@@ -92,14 +92,13 @@ RUN if [ "$BUNDLE" = "true" ]; then \
                ln -s "/usr/lib/${PACKAGE_NAME}/$(basename "$f")" "/output/usr/bin/$(basename "$f")"; \
            done; \
     else \
-        rm -rf /tmp/binary-bundle; \
-        for f in /tmp/binary-source/*; do \
+        for f in /tmp/binary-bundle/*; do \
             [ -f "$f" ] || continue; \
             file -b "$f" | grep -q "^ELF " && cp "$f" /output/usr/bin/ || true; \
         done \
-        && chmod +x /output/usr/bin/* \
-        && rm -rf /tmp/binary-source; \
+        && chmod +x /output/usr/bin/* 2>/dev/null || true; \
     fi \
+    && rm -rf /tmp/binary-bundle \
     && [ -n "$(ls -A /output/usr/bin 2>/dev/null)" ] || \
        (echo "ERROR: no executables landed in /usr/bin (BUNDLE=$BUNDLE, BINARY_SOURCE=$BINARY_SOURCE) - check binary_path/bundle config" >&2; exit 1)
 
