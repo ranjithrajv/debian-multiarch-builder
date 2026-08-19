@@ -280,7 +280,28 @@ Please check:
         binary_source="$extract_dir"
     fi
 
-    # Validate binary source exists
+    # Validate binary source exists. binary_path may contain a glob (e.g.
+    # "dist/*") for upstreams whose wrapping directory name embeds the
+    # version/arch and so can't be hardcoded (e.g. superfile's release
+    # archives nest the binary at dist/superfile-linux-v<VERSION>-<ARCH>/).
+    # Testing the literal string would always report "not found" since no
+    # path literally contains an asterisk - expand it here instead, and
+    # resolve binary_source to the actual matched path so every downstream
+    # use (including the Docker build-arg) gets a concrete path rather than
+    # depending on Docker COPY's own glob semantics a second time.
+    if [ ! -e "$binary_source" ]; then
+        local glob_match=""
+        for candidate in $binary_source; do
+            if [ -e "$candidate" ]; then
+                glob_match="$candidate"
+                break
+            fi
+        done
+        if [ -n "$glob_match" ]; then
+            binary_source="$glob_match"
+        fi
+    fi
+
     if [ ! -d "$binary_source" ] && [ ! -f "$binary_source" ]; then
         error "Binary source not found: $binary_source
 
