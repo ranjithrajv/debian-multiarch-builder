@@ -66,6 +66,12 @@ RUN mkdir -p /output/usr/bin \
 # intact as siblings.
 COPY ${BINARY_SOURCE}/* /tmp/binary-source/
 COPY ${BINARY_SOURCE} /tmp/binary-bundle
+# Bundle-mode executable discovery covers two shapes: a bin/ subdirectory
+# (zed.app/{bin,lib,libexec,share}, an FHS-like tree), and executables
+# sitting directly at the bundle root as siblings of the data directories
+# they need (pnpm's Node single-executable-application binary needs its
+# own dist/ alongside it, with no bin/lib/libexec structure at all). Check
+# both rather than requiring upstream's layout to match one specific shape.
 RUN if [ "$BUNDLE" = "true" ]; then \
         rm -rf /tmp/binary-source \
         && mkdir -p "/output/usr/lib/${PACKAGE_NAME}" \
@@ -78,7 +84,13 @@ RUN if [ "$BUNDLE" = "true" ]; then \
                    chmod +x "$f"; \
                    ln -s "/usr/lib/${PACKAGE_NAME}/bin/$(basename "$f")" "/output/usr/bin/$(basename "$f")"; \
                done; \
-           fi; \
+           fi \
+        && for f in "/output/usr/lib/${PACKAGE_NAME}/"*; do \
+               [ -f "$f" ] || continue; \
+               file -b "$f" | grep -q "^ELF " || continue; \
+               chmod +x "$f"; \
+               ln -s "/usr/lib/${PACKAGE_NAME}/$(basename "$f")" "/output/usr/bin/$(basename "$f")"; \
+           done; \
     else \
         rm -rf /tmp/binary-bundle; \
         for f in /tmp/binary-source/*; do \
