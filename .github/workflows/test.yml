@@ -1,0 +1,24 @@
+# Unit Tests - CI Optimization
+#
+# Runs test-ci-optimization.sh, which validates CI environment detection
+# and resource-based parallelism logic (src/ci-optimization.sh).
+
+name: Test - CI Optimization
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: CI Optimization Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run CI optimization tests
+        run: bash test-ci-optimization.sh

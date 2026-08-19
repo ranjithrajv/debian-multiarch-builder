@@ -96,32 +96,3 @@ add_failure_detail() {
     
     echo "Failure detail: $key = $value" >> "$TELEMETRY_DIR/failure_details.log"
 }
-
-# Cleanup telemetry files
-cleanup_telemetry() {
-    if [ "$TELEMETRY_ENABLED" = "false" ]; then
-        return 0
-    fi
-    
-    # Remove temporary telemetry files
-    rm -f "$TELEMETRY_DIR"/{*.log,*.tmp}
-}
-
-# Resource monitoring (minimal implementation)
-start_resource_monitoring() {
-    if [ "$TELEMETRY_ENABLED" = "false" ]; then
-        return 0
-    fi
-    
-    # No-op for minimal implementation
-    return 0
-}
-
-stop_resource_monitoring() {
-    if [ "$TELEMETRY_ENABLED" = "false" ]; then
-        return 0
-    fi
-    
-    # No-op for minimal implementation  
-    return 0
-}

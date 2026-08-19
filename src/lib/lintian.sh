@@ -8,14 +8,6 @@ LINTIAN_TOTAL_ERRORS=0
 LINTIAN_TOTAL_WARNINGS=0
 LINTIAN_TOTAL_INFO=0
 
-# Initialize lintian results directory
-init_lintian_results() {
-    mkdir -p "$LINTIAN_RESULTS_DIR"
-    LINTIAN_TOTAL_ERRORS=0
-    LINTIAN_TOTAL_WARNINGS=0
-    LINTIAN_TOTAL_INFO=0
-}
-
 # Check if lintian is installed
 check_lintian_installed() {
     if ! command -v lintian &> /dev/null; then

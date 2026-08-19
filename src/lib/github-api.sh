@@ -159,67 +159,6 @@ Please check: https://github.com/${GITHUB_REPO}/releases/tag/${VERSION}"
     fi
 }
 
-# Function to fetch full release data (for validation and other uses)
-fetch_release_data() {
-    local cache_file="${API_CACHE_DIR}/release_data_${GITHUB_REPO//\//_}_${VERSION}.cache"
-    local cache_meta="${cache_file}.meta"
-    
-    # Check cache freshness (5 minutes)
-    if [ -f "$cache_file" ] && [ -f "$cache_meta" ]; then
-        local cache_time=$(cat "$cache_meta" 2>/dev/null || echo "0")
-        local current_time=$(date +%s)
-        local cache_age=$((current_time - cache_time))
-        
-        if [ $cache_age -lt 300 ]; then
-            cat "$cache_file"
-            return 0
-        else
-            rm -f "$cache_file" "$cache_meta" 2>/dev/null || true
-        fi
-    fi
-
-    local api_url="https://api.github.com/repos/${GITHUB_REPO}/releases/tags/${VERSION}"
-    
-    # Use file locking
-    local lock_file="${cache_file}.lock"
-    (
-        flock -x 200
-        
-        # Double-check cache
-        if [ -f "$cache_file" ] && [ -f "$cache_meta" ]; then
-            local cache_time=$(cat "$cache_meta" 2>/dev/null || echo "0")
-            local current_time=$(date +%s)
-            local cache_age=$((current_time - cache_time))
-            
-            if [ $cache_age -lt 300 ]; then
-                cat "$cache_file"
-                exit 0
-            fi
-        fi
-        
-        local release_data=$(api_call_with_retry "$api_url")
-        
-        if [ -z "$release_data" ]; then
-            exit 1
-        fi
-        
-        # Cache the response
-        echo "$release_data" > "${cache_file}.tmp" && mv "${cache_file}.tmp" "$cache_file"
-        echo "$(date +%s)" > "$cache_meta"
-        echo "$release_data"
-        
-    ) 200>"$lock_file"
-    
-    local exit_code=$?
-    rm -f "$lock_file" 2>/dev/null || true
-    
-    if [ $exit_code -eq 0 ]; then
-        cat "$cache_file"
-    else
-        return 1
-    fi
-}
-
 # Reformat raw license text into Debian copyright-format continuation lines:
 # https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/ requires
 # every continuation line to start with a space, and blank lines within a
@@ -331,17 +270,4 @@ cleanup_api_cache() {
     
     local data_pattern="${API_CACHE_DIR}/release_data_${GITHUB_REPO//\//_}_${VERSION}.cache*"
     rm -f $data_pattern 2>/dev/null || true
-}
-
-# Function to cleanup all stale API cache files (older than 1 hour)
-cleanup_all_api_cache() {
-    if [ -d "$API_CACHE_DIR" ]; then
-        # Remove cache files older than 1 hour
-        find "$API_CACHE_DIR" -name "*.cache" -type f -mmin +60 -delete 2>/dev/null || true
-        find "$API_CACHE_DIR" -name "*.meta" -type f -mmin +60 -delete 2>/dev/null || true
-        find "$API_CACHE_DIR" -name "*.lock" -type f -mmin +5 -delete 2>/dev/null || true
-        
-        # Remove empty directory
-        rmdir "$API_CACHE_DIR" 2>/dev/null || true
-    fi
 }

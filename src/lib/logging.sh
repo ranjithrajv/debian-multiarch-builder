@@ -118,7 +118,7 @@ warning() {
 }
 
 info() {
-    echo -e "${BLUE}ℹ️  INFO: $1${NC}"
+    echo -e "${BLUE}ℹ️  INFO: $1${NC}" >&2
 }
 
 success() {
@@ -138,82 +138,4 @@ debug() {
     if [ "${DEBUG:-false}" = "true" ]; then
         echo -e "${YELLOW}🔍 DEBUG: $1${NC}" >&2
     fi
-}
-
-# Enhanced error with root cause analysis
-error_with_cause() {
-    local message="$1"
-    local cause="$2"
-    local solution="$3"
-    local error_type="${4:-generic}"
-    
-    echo -e "${RED}❌ ERROR: $message${NC}" >&2
-    
-    if [ -n "$cause" ]; then
-        echo "" >&2
-        echo -e "${YELLOW}🔍 Root cause:${NC}" >&2
-        echo "   $cause" >&2
-    fi
-    
-    if [ -n "$solution" ]; then
-        echo "" >&2
-        echo -e "${YELLOW}💡 Solution:${NC}" >&2
-        echo "   $solution" >&2
-    fi
-    
-    # Add additional contextual help
-    case "$error_type" in
-        "404")
-            echo "" >&2
-            echo -e "${BLUE}📋 Related commands:${NC}" >&2
-            echo "   curl -I https://api.github.com/repos/\$repo/releases/tags/\$version" >&2
-            echo "   ./build.sh config.yaml \$version 1 --dry-run" >&2
-            echo "" >&2
-            ;;
-        "403")
-            echo "" >&2
-            echo -e "${BLUE}📋 API Rate Limit Info:${NC}" >&2
-            echo "   curl -sL https://api.github.com/rate_limit" >&2
-            echo "" >&2
-            echo "   Unauthenticated requests: 60/hour" >&2
-            echo "   Set GITHUB_TOKEN for higher limits" >&2
-            echo "" >&2
-            ;;
-    esac
-    
-    exit 1
-}
-
-# Usage and help utilities
-show_usage() {
-    local script_name="$1"
-    cat << EOF
-Usage: $script_name <config-file> <version> <build-version> [architecture] [options]
-
-Arguments:
-  config-file     Path to multiarch-config.yaml
-  version         Version to build (e.g., 0.9.3)
-  build-version   Debian build version (e.g., 1)
-  architecture    Target architecture or 'all' (default: all)
-
-Options:
-  --dry-run       Validate configuration without building
-  --help, -h      Show this help message
-
-Examples:
-  $script_name config.yaml 2.35.0 1 arm64              # Build for arm64 only
-  $script_name config.yaml 2.35.0 1 all                # Build for all architectures
-  $script_name config.yaml 2.35.0 1 all --dry-run      # Validate first
-
-Supported architectures: amd64, arm64, armel, armhf, i386, ppc64el, s390x, riscv64, loong64
-
-Environment Variables:
-  MAX_PARALLEL    Maximum concurrent builds (default: 2)
-  PARALLEL_BUILDS Enable parallel builds (default: true)
-  TELEMETRY_ENABLED Enable build telemetry (default: true)
-  LINTIAN_CHECK   Enable lintian validation (default: false)
-  DEBUG           Enable debug output (default: false)
-
-Documentation: docs/
-EOF
 }

@@ -5,6 +5,12 @@
 
 set -e
 
+# ci-optimization.sh sources "$SCRIPT_DIR/data/yaml-utils.sh" and calls
+# warning() from logging.sh, both of which main.sh normally sets up before
+# sourcing it. Replicate that here since this script sources it directly.
+export SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/src" && pwd)"
+source src/lib/logging.sh
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -72,7 +78,7 @@ test_github_actions_standard() {
     export RUNNER_NAME="GitHub Actions 1"
 
     # Source the CI optimization module
-    source src/lib/ci-optimization.sh
+    source src/ci-optimization.sh
 
     # Initialize CI detection
     init_ci_optimization
@@ -96,7 +102,7 @@ test_ci_fallback() {
     # Simulate GitLab CI environment
     export GITLAB_CI="true"
 
-    source src/lib/ci-optimization.sh
+    source src/ci-optimization.sh
     init_ci_optimization
 
     if [ "$CI_ENVIRONMENT" = "gitlab-ci" ] && \
@@ -112,7 +118,7 @@ test_ci_fallback() {
 test_local_environment() {
     cleanup_test_env
 
-    source src/lib/ci-optimization.sh
+    source src/ci-optimization.sh
     init_ci_optimization
 
     # Should detect as non-CI environment but still detect system resources
@@ -183,7 +189,7 @@ test_parallel_job_calculation() {
 test_graceful_degradation() {
     cleanup_test_env
 
-    source src/lib/ci-optimization.sh
+    source src/ci-optimization.sh
 
     # Test with limited resources
     local requested_jobs=8
@@ -209,7 +215,7 @@ test_ci_optimization_application() {
     export IS_CI_ENVIRONMENT="true"
     RESOURCE_BASED_LIMITS=true
 
-    source src/lib/ci-optimization.sh
+    source src/ci-optimization.sh
 
     # Test with high user request that should be limited
     local result=$(apply_ci_optimizations "8")
@@ -231,7 +237,7 @@ test_environment_validation() {
     export RUNNER_DISK_GB=20
     export IS_CI_ENVIRONMENT="false"  # Set to false to avoid Docker requirement
 
-    source src/lib/ci-optimization.sh
+    source src/ci-optimization.sh
 
     # Should pass validation with adequate resources (function returns 0 for pass)
     local validation_output=$(validate_build_environment 2>&1)
@@ -250,7 +256,7 @@ test_environment_validation() {
 test_ci_report_generation() {
     cleanup_test_env
 
-    source src/lib/ci-optimization.sh
+    source src/ci-optimization.sh
 
     # Set variables after sourcing to avoid reset
     CI_ENVIRONMENT="github-actions"
@@ -279,15 +285,17 @@ test_ci_report_generation() {
 test_resource_limits_config() {
     cleanup_test_env
 
-    source src/lib/ci-optimization.sh
+    source src/ci-optimization.sh
 
-    # Test resource parallel limits mapping
+    # Test resource parallel limits, sourced from data/ci-environments.yaml
+    # via get_resource_parallel_limit() (data/yaml-utils.sh)
     local expected_limit_2_7="2"  # 2 cores, 7GB RAM should give 2 jobs
-    local actual_limit="${RESOURCE_PARALLEL_LIMITS["2:7"]}"
+    local actual_limit=$(get_resource_parallel_limit 2 7)
 
     if [ "$actual_limit" = "$expected_limit_2_7" ]; then
         return 0
     else
+        echo "Debug: Expected '$expected_limit_2_7', got '$actual_limit'" >&2
         return 1
     fi
 }
@@ -296,16 +304,18 @@ test_resource_limits_config() {
 test_runner_specifications() {
     cleanup_test_env
 
-    source src/lib/ci-optimization.sh
+    source src/ci-optimization.sh
 
-    # Test known runner specification
-    local expected_spec="2_core_7gb"  # ubuntu-latest: 2 cores, 7GB RAM
-    local actual_spec="${GITHUB_RUNNER_SPECS["ubuntu-latest"]}"
+    # Test known runner specification, via detect_linux_runner_specs()
+    export RUNNER_NAME="GitHub Actions ubuntu-latest"
+    detect_linux_runner_specs
 
-    if [ "$actual_spec" = "$expected_spec" ]; then
+    if [ "$RUNNER_TYPE" = "github-actions-ubuntu-standard" ] && \
+       [ "$RUNNER_CPU_CORES" -eq 2 ] && \
+       [ "$RUNNER_MEMORY_GB" -eq 7 ]; then
         return 0
     else
-        echo "Debug: Expected '$expected_spec', got '$actual_spec'" >&2
+        echo "Debug: Expected type=github-actions-ubuntu-standard cores=2 mem=7, got type=$RUNNER_TYPE cores=$RUNNER_CPU_CORES mem=$RUNNER_MEMORY_GB" >&2
         return 1
     fi
 }
@@ -318,7 +328,7 @@ main() {
     echo ""
 
     # Check if we're in the right directory
-    if [ ! -f "src/lib/ci-optimization.sh" ]; then
+    if [ ! -f "src/ci-optimization.sh" ]; then
         log_error "ci-optimization.sh not found. Please run from project root."
         exit 1
     fi
