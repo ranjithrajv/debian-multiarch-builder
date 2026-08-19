@@ -38,6 +38,13 @@ parse_config() {
     # under its bin/ subdirectory are symlinked into /usr/bin.
     BUNDLE=$(yq eval '.bundle // "false"' "$package_file")
 
+    # Extra runtime Depends: for the control file (comma-separated, same
+    # syntax dpkg expects), for upstream binaries that dynamically link
+    # against a shared library not present on a bare Debian install (e.g.
+    # pnpm's Node single-executable-application binary needs libatomic1,
+    # which a minimal install doesn't pull in on its own).
+    DEPENDS=$(yq eval '.depends // ""' "$package_file")
+
     # Short package description for the control file's Description synopsis.
     # Falls back to a minimal but accurate description (rather than the
     # control template's literal placeholder text) when not configured.

@@ -111,7 +111,7 @@ build_all_architectures_parallel() {
     export LICENSE_SPDX LICENSE_TEXT
     export MAX_PARALLEL LINTIAN_CHECK TELEMETRY_ENABLED SAVE_BASELINE
     export ARCH CONFIG_FILE ACTION_PATH
-    export AUTO_DISCOVERY ARTIFACT_FORMAT BINARY_PATH DISTRIBUTIONS 2>/dev/null || true
+    export AUTO_DISCOVERY ARTIFACT_FORMAT BINARY_PATH BINARY_RENAME BUNDLE DEPENDS DISTRIBUTIONS 2>/dev/null || true
     # Telemetry state (may be unset if telemetry is disabled — that is fine)
     export BUILD_START_TIME TELEMETRY_DIR 2>/dev/null || true
 

@@ -13,6 +13,7 @@ ARG ARCH
 ARG BINARY_SOURCE
 ARG BINARY_RENAME
 ARG BUNDLE
+ARG DEPENDS
 ARG GITHUB_REPO
 ARG DESCRIPTION
 ARG LICENSE_SPDX
@@ -121,6 +122,16 @@ RUN if [ -f /tmp/package-files/README.md ]; then \
 # Process templates and create final files in a single layer
 RUN envsubst '${PACKAGE_NAME} ${VERSION} ${BUILD_VERSION} ${DIST} ${SUPPORTED_ARCHITECTURES} ${GITHUB_REPO} ${DESCRIPTION}' \
         < /tmp/control.template > /output/DEBIAN/control
+
+# Some upstream binaries dynamically link against a shared library that
+# isn't installed by default on a bare Debian system (e.g. pnpm's Node
+# single-executable-application binary needs libatomic1, which a minimal
+# install doesn't pull in on its own) - apt won't install it automatically
+# unless the package declares it. When depends is set in package.yaml,
+# append a Depends: line so apt installs it alongside the package.
+RUN if [ -n "$DEPENDS" ]; then \
+        echo "Depends: ${DEPENDS}" >> /output/DEBIAN/control; \
+    fi
 
 RUN envsubst '${PACKAGE_NAME} ${FULL_VERSION} ${DIST} ${VERSION}' \
         < /tmp/changelog.template | gzip -9 > "/output/usr/share/doc/${PACKAGE_NAME}/changelog.Debian.gz"
