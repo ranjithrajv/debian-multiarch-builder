@@ -143,8 +143,24 @@ verify_checksum() {
             expected_checksum="$first_field"
         fi
     elif [ -f "$checksum_file" ] && [ $(wc -l < "$checksum_file") -eq 1 ]; then
-        # Single checksum file for single archive
-        expected_checksum=$(awk '{print $1}' "$checksum_file")
+        # Single checksum file for single archive - but only trust it when
+        # the line's filename field (if any) doesn't point to something
+        # else entirely. Some upstreams (e.g. zellij-org/zellij) publish a
+        # per-asset checksum file whose recorded hash is for the raw
+        # binary BEFORE archiving (e.g.
+        # "target/aarch64-unknown-linux-musl/release/zellij"), not for the
+        # .tar.gz actually downloaded - those have different bytes and can
+        # never match, so a path-shaped second field means "not for this
+        # archive" rather than a real mismatch.
+        local line_second_field=$(awk '{print $2}' "$checksum_file")
+        case "$line_second_field" in
+            */*)
+                warning "Checksum file's second field ('$line_second_field') looks like a build-tree path, not $archive_name - skipping (likely checksums the pre-archive binary, not the release asset)"
+                ;;
+            *)
+                expected_checksum=$(awk '{print $1}' "$checksum_file")
+                ;;
+        esac
     fi
 
     # A real SHA-256 is exactly 64 hex characters - anything else means
