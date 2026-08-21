@@ -22,6 +22,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Security guide** gained a Provenance Pinning (`pinned-metadata`) section
   documenting the modern per-asset and legacy pin layouts
 
+## [v.0.1a23] - 2026-08-21
+
+### Added
+- **Automatic suite retirement**: the builder now skips producing .deb
+  packages for any distribution whose `lts_support_ends` (system.yaml) has
+  passed, even if a package.yaml explicitly lists it. A missing/null date
+  (forky, sid) always passes through unaffected.
+
+### Fixed
+- **Default `debian_distributions` parsing dropped literal "-" tokens into
+  the build list** — yq's block-list rendering of the fallback array
+  wasn't stripped by the old `tr -d '[],"'`, so every package.yaml that
+  doesn't set `debian_distributions` itself (24 of 25 repos in the fleet)
+  has been building with a bogus "-" pseudo-distribution mixed in. Fixed
+  by querying the array's elements directly instead of the array itself.
+
 ## [v.0.1a22] - 2026-08-21
 
 ### Added
