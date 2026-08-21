@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Security guide** gained a Provenance Pinning (`pinned-metadata`) section
   documenting the modern per-asset and legacy pin layouts
 
-## [v.0.1a21] - 2026-08-21
+## [v.0.1a22] - 2026-08-21
 
 ### Added
 - **Bullseye (Debian 11) distribution support** — added to the valid
