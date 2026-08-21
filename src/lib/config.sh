@@ -84,16 +84,47 @@ parse_config() {
         info "Using architectures from config"
     fi
     
-    # Parse distributions (with defaults)
-    DISTRIBUTIONS=$(yq eval '.debian_distributions // ["bullseye", "bookworm", "trixie", "forky", "sid"]' "$package_file" | tr -d '[],"')
+    # Parse distributions (with defaults). Querying the array's elements
+    # directly (trailing []) rather than the array itself avoids yq's
+    # block-list rendering ("- bookworm\n- trixie\n..."), which a plain
+    # `tr -d '[],"'` doesn't strip - it left literal "-" tokens mixed into
+    # DISTRIBUTIONS for every package that relies on this default (i.e.
+    # every package.yaml that doesn't set debian_distributions itself).
+    DISTRIBUTIONS=$(yq eval '(.debian_distributions // ["bullseye", "bookworm", "trixie", "forky", "sid"])[]' "$package_file")
     DISTRIBUTIONS=$(echo "$DISTRIBUTIONS" | tr '\n' ' ' | sed 's/ *$//')
 
     if [ -z "$DISTRIBUTIONS" ]; then
         DISTRIBUTIONS="bullseye bookworm trixie forky sid"
         info "No distributions specified, using defaults: $DISTRIBUTIONS"
     fi
-    
+
+    DISTRIBUTIONS=$(filter_expired_distributions "$DISTRIBUTIONS")
+
     info "Configuration loaded successfully"
+}
+
+# Drop any distribution whose lts_support_ends (system.yaml, the canonical
+# policy file) is in the past - we stop shipping .deb packages for a suite
+# once Debian itself has stopped supporting it, even if a package.yaml
+# explicitly lists it. A null/missing lts_support_ends (forky, sid - no
+# fixed end date) always passes through.
+filter_expired_distributions() {
+    local requested="$1"
+    local today kept=""
+    today="$(date -u +%Y-%m-%d)"
+
+    for dist in $requested; do
+        local ends
+        ends=$(yq eval ".distributions.details.\"$dist\".lts_support_ends // \"\"" \
+            "$SCRIPT_DIR/data/system.yaml" 2>/dev/null)
+        if [ -n "$ends" ] && [ "$ends" != "null" ] && [[ "$ends" < "$today" ]]; then
+            warning "Skipping $dist: LTS support ended $ends"
+        else
+            kept="$kept $dist"
+        fi
+    done
+
+    echo "$kept" | sed 's/^ *//'
 }
 
 # Get supported architectures
