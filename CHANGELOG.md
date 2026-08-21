@@ -22,6 +22,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Security guide** gained a Provenance Pinning (`pinned-metadata`) section
   documenting the modern per-asset and legacy pin layouts
 
+## [v.0.1a21] - 2026-08-21
+
+### Added
+- **Bullseye (Debian 11) distribution support** — added to the valid
+  distributions list, the default architecture set (amd64, arm64, armel,
+  armhf, i386, ppc64el, s390x — matching bookworm), and the i386/armel
+  restricted-architecture rules in `system.yaml`. The `debian_distributions`
+  default (used when a package omits it) now includes bullseye alongside
+  bookworm, trixie, forky, and sid.
+
 ## [v.0.1a16] - 2026-08-19
 
 ### Added
