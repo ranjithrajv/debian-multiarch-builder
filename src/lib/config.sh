@@ -85,11 +85,11 @@ parse_config() {
     fi
     
     # Parse distributions (with defaults)
-    DISTRIBUTIONS=$(yq eval '.debian_distributions // ["bookworm", "trixie", "forky", "sid"]' "$package_file" | tr -d '[],"')
+    DISTRIBUTIONS=$(yq eval '.debian_distributions // ["bullseye", "bookworm", "trixie", "forky", "sid"]' "$package_file" | tr -d '[],"')
     DISTRIBUTIONS=$(echo "$DISTRIBUTIONS" | tr '\n' ' ' | sed 's/ *$//')
-    
+
     if [ -z "$DISTRIBUTIONS" ]; then
-        DISTRIBUTIONS="bookworm trixie forky sid"
+        DISTRIBUTIONS="bullseye bookworm trixie forky sid"
         info "No distributions specified, using defaults: $DISTRIBUTIONS"
     fi
     

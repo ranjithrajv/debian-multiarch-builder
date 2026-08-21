@@ -3,12 +3,21 @@
 
 distributions:
   valid:
+    - bullseye    # Debian 11 (oldoldstable)
     - bookworm    # Debian 12 (stable)
     - trixie      # Debian 13 (testing)
     - forky       # Debian 14 (future)
     - sid         # Debian unstable
 
   details:
+    bullseye:
+      version: "11"
+      status: oldoldstable
+      release_date: "2021-08-14"
+      security_support_ends: "2024-08-14"
+      lts_support_ends: "2026-08-31"
+      description: "Debian 11 (oldoldstable, LTS)"
+
     bookworm:
       version: "12"
       status: oldstable
@@ -43,6 +52,15 @@ distributions:
 
 # Default architectures for each distribution
 default_architectures:
+  bullseye:
+    - amd64
+    - arm64
+    - armel  # Last version as regular architecture
+    - armhf
+    - i386   # Deprecated in Trixie+
+    - ppc64el
+    - s390x
+
   bookworm:
     - amd64
     - arm64

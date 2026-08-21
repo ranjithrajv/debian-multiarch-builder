@@ -10,12 +10,20 @@ metadata:
 # Valid Debian distributions
 distributions:
   valid:
+    - bullseye  # Debian 11 (oldoldstable)
     - bookworm  # Debian 12 (stable)
     - trixie    # Debian 13 (testing)
     - forky     # Debian 14 (future)
     - sid       # Debian unstable
 
   details:
+    bullseye:
+      version: "11"
+      status: oldoldstable
+      release_date: "2021-08-14"
+      security_support_ends: "2024-08-14"
+      lts_support_ends: "2026-08-31"
+
     bookworm:
       version: "12"
       status: oldstable
@@ -61,13 +69,15 @@ architecture_support:
   restricted:
     i386:
       distributions:
+        - bullseye
         - bookworm
         - trixie
       reason: "Reduced support in Trixie v13+ (partial userland only)"
-      note: "Full installation support only in Bookworm, partial userland in Trixie+"
+      note: "Full installation support only in Bullseye/Bookworm, partial userland in Trixie+"
 
     armel:
       distributions:
+        - bullseye
         - bookworm
         - trixie
       reason: "Limited security support in Trixie v13+ (glibc maintenance issues)"

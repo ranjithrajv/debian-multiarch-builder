@@ -411,7 +411,7 @@ Please check:
             for arch in $(cat /tmp/attempted_architectures.txt 2>/dev/null); do
                 # Get distribution support for this architecture
                 supported_count=0
-                for dist in "bookworm" "trixie" "forky" "sid"; do
+                for dist in "bullseye" "bookworm" "trixie" "forky" "sid"; do
                     if is_arch_supported_for_dist "$arch" "$dist"; then
                         supported_count=$((supported_count + 1))
                     fi
