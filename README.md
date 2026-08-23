@@ -141,16 +141,19 @@ Reusable across `latest-debs` fleet (`41` `*-debian` repos, `~328` schedules/day
 
 *Receipt:* `~30s` saved per real build (`~15%` wall, `~40m/day` org-wide `6` builds). `actions/cache` is `node20` today (`main` already `node24`, tag pending) — warning is benign, cost win is real.
 
-## Supported Debian Versions and Architectures
+## Supported Debian & Ubuntu Versions and Architectures
 
-This action supports multiple Debian distributions and architectures. The table below shows the currently supported combinations:
+This action supports Debian and Ubuntu distributions. The table below shows the currently supported combinations:
 
-| Debian Version | Codename | Status | Supported Architectures |
-|----------------|----------|--------|-------------------------|
-| 12 | bookworm | oldstable | amd64, arm64, armel, armhf, i386, mips64el, mipsel, ppc64el, s390x |
-| 13 | trixie | stable | amd64, arm64, armel, armhf, i386, ppc64el, s390x, riscv64 |
-| 14 | forky | testing | amd64, arm64, armhf, ppc64el, s390x, riscv64, loong64 |
-| unstable | sid | perpetual | amd64, arm64, armhf, ppc64el, s390x, riscv64, loong64 |
+| Debian Version | Debian Codename | Ubuntu Version | Ubuntu Codename | Status | Supported Architectures |
+|----------------|-----------------|----------------|-----------------|--------|-------------------------|
+| 11 | bullseye | — | — | oldoldstable | amd64, arm64, armel, armhf, i386, ppc64el, s390x |
+| 12 | bookworm | — | — | oldstable | amd64, arm64, armel, armhf, i386, mips64el, mipsel, ppc64el, s390x |
+| 13 | trixie | — | — | stable | amd64, arm64, armel, armhf, i386, ppc64el, s390x, riscv64 |
+| 14 | forky | — | — | testing | amd64, arm64, armhf, ppc64el, s390x, riscv64, loong64 |
+| unstable | sid | — | — | perpetual | amd64, arm64, armhf, ppc64el, s390x, riscv64, loong64 |
+| — | — | 22.04 LTS | jammy | LTS (alias of `bullseye` for `+jammy` substring UX, no extra build) | amd64, arm64 (via `bullseye` copy) |
+| — | — | 24.04 LTS | noble | LTS | amd64, arm64, armhf, ppc64el, s390x, riscv64 |
 
 **Architecture Notes:**
 - `i386`: Full support in bookworm, reduced (partial userland) support in trixie and later
