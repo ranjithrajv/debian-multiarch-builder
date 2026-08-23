@@ -123,7 +123,9 @@ Go to the **Actions** tab in your GitHub repository, select the workflow, and cl
 
 ## Proven at Scale — latest-debs (41 repos)
 
-Reusable across `latest-debs` fleet (`41` `*-debian` repos, `~328` schedules/day, `~6` real builds/day). Generic win is **pinned `2-arch` tools** (`amd64+arm64` `package.yaml` like `bun`, `deno`, `duckdb`, `atuin` — the `tool` pattern: single binary, 2 Linux archs, 4-5 Debian suites):
+Reusable across `latest-debs` fleet (`41` `*-debian` repos, `~328` schedules/day, `~6` real builds/day).
+
+**1. Pinned `2-arch` tools** (`amd64+arm64` `package.yaml` like `bun`, `deno`, `duckdb`, `atuin` — single binary, 2 Linux archs, 4-5 suites) — **matrix native**:
 
 | | Single `ubuntu-24.04-arm` (emulated `amd64`) | Matrix `amd64:ubuntu-24.04` + `arm64:ubuntu-24.04-arm` (native both) |
 |---|---|---|
@@ -131,9 +133,13 @@ Reusable across `latest-debs` fleet (`41` `*-debian` repos, `~328` schedules/day
 | **Billable** | `19.5` | `13.5` **`-43%`** (`amd64` `1x` vs `6x`) |
 | **Smoke** | `arm64` native only | `amd64` + `arm64` native — catches `amd64` `Glibc`/`Depends` + Pi `4k` page |
 
-*Receipts:* `bun-debian` single `32625203279` vs matrix `32626542663` on `v.0.1a23`. Template: `strategy.matrix: {arch:[amd64,arm64], runner:[ubuntu-24.04,ubuntu-24.04-arm]}`, `architecture: ${{ matrix.arch }}`, artifacts `*-${{ matrix.arch }}` + `pattern: *-*/merge-multiple` for release.
+*Receipts:* `bun-debian` single `32625203279` vs matrix `32626542663` on `v.0.1a23`. Template: `strategy.matrix: {arch:[amd64,arm64], runner:[ubuntu-24.04,ubuntu-24.04-arm]}`, `architecture: ${{ matrix.arch }}`, artifacts `*-${{ matrix.arch }}` + `pattern: *-*/merge-multiple` for release. Limit for `auto` `7-arch` (`ruff` `7/9`) still needs `QEMU` for `s390x/riscv64` — matrix only accelerates `2/7`, wall `-19%`. Don't pitch matrix as generic for `auto`.
 
-Limit: `auto-discovery` `7-arch` (`ruff` `7/9`) still needs `QEMU` for `s390x/riscv64` — matrix only accelerates `2/7`, wall `-19%`. Don't pitch matrix as generic for `auto`.
+**2. Cache upstream + `apt` (generic, all repos):**
+
+`actions/cache@v4` ` /tmp/download_cache` `key: download-${{arch}}-${{version}}` + ` /var/cache/apt/archives` `key: apt-${{hashFiles('package.yaml')}}` persists `download-cache.sh` `24h` TTL and `apt` across runs.
+
+*Receipt:* `~30s` saved per real build (`~15%` wall, `~40m/day` org-wide `6` builds). `actions/cache` is `node20` today (`main` already `node24`, tag pending) — warning is benign, cost win is real.
 
 ## Supported Debian Versions and Architectures
 
