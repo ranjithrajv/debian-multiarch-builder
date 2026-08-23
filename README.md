@@ -121,6 +121,20 @@ Go to the **Actions** tab in your GitHub repository, select the workflow, and cl
 *   **📦 12+ Templates** - Pre-built configs for popular Rust, Go, and C/C++ projects
 *   **🤖 Auto-Discovery** - Automatically detects release patterns from GitHub
 
+## Proven at Scale — latest-debs (41 repos)
+
+Reusable across `latest-debs` fleet (`41` `*-debian` repos, `~328` schedules/day, `~6` real builds/day). Generic win is **pinned `2-arch` tools** (`amd64+arm64` `package.yaml` like `bun`, `deno`, `duckdb`, `atuin` — the `tool` pattern: single binary, 2 Linux archs, 4-5 Debian suites):
+
+| | Single `ubuntu-24.04-arm` (emulated `amd64`) | Matrix `amd64:ubuntu-24.04` + `arm64:ubuntu-24.04-arm` (native both) |
+|---|---|---|
+| **Wall** `8 debs` | `~190s` | `~110s` **`-42%`** |
+| **Billable** | `19.5` | `13.5` **`-43%`** (`amd64` `1x` vs `6x`) |
+| **Smoke** | `arm64` native only | `amd64` + `arm64` native — catches `amd64` `Glibc`/`Depends` + Pi `4k` page |
+
+*Receipts:* `bun-debian` single `32625203279` vs matrix `32626542663` on `v.0.1a23`. Template: `strategy.matrix: {arch:[amd64,arm64], runner:[ubuntu-24.04,ubuntu-24.04-arm]}`, `architecture: ${{ matrix.arch }}`, artifacts `*-${{ matrix.arch }}` + `pattern: *-*/merge-multiple` for release.
+
+Limit: `auto-discovery` `7-arch` (`ruff` `7/9`) still needs `QEMU` for `s390x/riscv64` — matrix only accelerates `2/7`, wall `-19%`. Don't pitch matrix as generic for `auto`.
+
 ## Supported Debian Versions and Architectures
 
 This action supports multiple Debian distributions and architectures. The table below shows the currently supported combinations:
