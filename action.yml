@@ -81,6 +81,12 @@ runs:
           # runner IPs share a 60/hour rate limit across every workflow on
           # that IP, which this org's growing build volume exhausts easily,
           # misreporting real releases as "does not exist".
+          # EXCEPTION (learned the hard way via aquasecurity/trivy): orgs
+          # with an IP allow list 403 EVERY authenticated API request from
+          # GitHub-hosted runner IPs ("correct authorization credentials,
+          # but ... IP address is not permitted"). On a failed authenticated
+          # check, retry tokenless - anonymous reads of PUBLIC release data
+          # are served to any IP - before declaring the version missing.
           AUTH_HEADER=()
           if [ -n "${GITHUB_TOKEN:-}" ]; then
             AUTH_HEADER=(-H "Authorization: token ${GITHUB_TOKEN}")
@@ -89,8 +95,14 @@ runs:
 
           echo "🌐 Checking release: $RELEASE_URL"
 
-          if curl -s -fL "${AUTH_HEADER[@]}" -o /dev/null -w "%{http_code}" "$RELEASE_URL" | grep -q "^200$"; then
+          check_release() {
+            curl -s -fL "$1" -o /dev/null -w "%{http_code}" "$RELEASE_URL" | grep -q "^200$"
+          }
+
+          if check_release "${AUTH_HEADER[@]}"; then
             echo "✅ Version ${{ inputs.version }} exists and is accessible"
+          elif [ "${#AUTH_HEADER[@]}" -gt 0 ] && check_release; then
+            echo "✅ Version ${{ inputs.version }} exists (authenticated check was IP-blocked; tokenless check passed)"
           else
             echo "❌ Version ${{ inputs.version }} does not exist or is not accessible!"
             echo ""
