@@ -5,9 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - Marketplace Publish Prep
+## [Unreleased]
+
+## [v.0.1a24] - 2026-08-26 - Marketplace Publish Prep
 
 ### Added
+- **`tar.xz`/`tar.bz2`/`tar.zst` upstream release archive support**
+  (`discovery.sh`, `build.sh`): format detection and extraction previously
+  only recognized `tar.gz`/`tgz`/`zip`, so an upstream shipping `tar.xz`
+  (e.g. `helix-editor/helix`, `fish-shell/fish`) would auto-detect as
+  `tar.gz` and then fail — or silently corrupt — at `tar -xzf`, since `-z`
+  can't read an xz-compressed stream. Extraction now drops `-z`/`-J` in
+  favor of tar's own compression auto-detection, so one code path covers
+  every tar variant. Companion to `latest-debs/apt-repo@1e92bf7`, which
+  added the same formats to the package-request intake/vetting pipeline —
+  that alone wasn't enough since the actual build runs through this action.
+  Adds `test-format-detection.sh`, wired into `test.yml` as its own job.
 - **Validation CI workflow** (`.github/workflows/ci.yml`) that gates every push and PR:
   - `actionlint` linting of all workflow files
   - `shellcheck` at error severity across all shell scripts
