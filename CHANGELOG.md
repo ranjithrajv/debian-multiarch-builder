@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v.0.1a25] - 2026-08-26
+
+### Added
+- **Bare/unarchived Linux binary support (`artifact_format: raw`)**
+  (`discovery.sh`, `build.sh`): some goreleaser/cargo-dist configs skip
+  archiving a single-binary release entirely (e.g.
+  jandedobbeleer/oh-my-posh's `posh-linux-amd64`, no `.tar.*`/`.zip`
+  wrapper), which had no code path at all - `auto_discover_pattern()`'s
+  filter required a recognized archive extension, and the extraction
+  switch had no case for "no archive." `raw` mode excludes known
+  non-binary asset types instead of requiring one for auto-discovery,
+  and `build.sh` moves the downloaded file into its own directory
+  (`${extract_dir}.d`, since a same-named `mkdir` would otherwise
+  collide with the file itself) so it looks like any other flat
+  single-file archive to the unchanged packaging step that follows.
+  Companion to `latest-debs/apt-repo@7274078`, which added the same
+  format to the package-request intake/vetting pipeline. Verified
+  end-to-end against a real jandedobbeleer/oh-my-posh binary: the
+  Dockerfile's existing ELF-detection/copy logic needed no changes,
+  and the resulting binary runs (`posh --version` -> `30.8.0`).
+  `test-format-detection.sh` gains raw-mode coverage of both the
+  auto-discovery filter and the extraction collision fix.
+
 ## [v.0.1a24] - 2026-08-26 - Marketplace Publish Prep
 
 ### Added

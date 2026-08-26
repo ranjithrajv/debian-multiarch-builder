@@ -58,6 +58,57 @@ for pair in "tar.gz:z" "tar.xz:J" "tar.bz2:j"; do
     fi
 done
 
+# Bare/unarchived binary support ("raw" format - e.g.
+# jandedobbeleer/oh-my-posh's "posh-linux-amd64", no .tar.*/.zip wrapper).
+# auto_discover_pattern()'s raw-mode branch excludes known non-binary asset
+# types instead of requiring an archive extension - fake fetch_release_assets
+# so this runs without a network call.
+fetch_release_assets() {
+    printf '%s\n' \
+        "posh-linux-amd64" \
+        "posh-linux-arm64" \
+        "posh-windows-amd64.exe" \
+        "posh-darwin-amd64" \
+        "themes.zip" \
+        "checksums.sha256"
+}
+ARTIFACT_FORMAT="raw"
+TESTS_TOTAL=$((TESTS_TOTAL + 1))
+got="$(auto_discover_pattern amd64)"
+if [ "$got" = "posh-linux-amd64" ]; then
+    echo -e "${GREEN}✅ PASS${NC}: raw-mode auto-discovery picks posh-linux-amd64 over themes.zip/checksums/other-OS assets"
+else
+    echo -e "${RED}❌ FAIL${NC}: raw-mode auto-discovery returned '$got' (expected posh-linux-amd64)"
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+fi
+unset ARTIFACT_FORMAT
+
+# build.sh's raw-case extraction: archive_name has no suffix to strip, so
+# extract_dir starts out identical to archive_name - the fix moves the file
+# into "${extract_dir}.d" instead of colliding with a same-named mkdir.
+TESTS_TOTAL=$((TESTS_TOTAL + 1))
+RAWTMP="$(mktemp -d)"
+(
+    cd "$RAWTMP"
+    archive_name="posh-linux-amd64"
+    extract_dir="${archive_name%.tar.gz}"; extract_dir="${extract_dir%.zip}"
+    extract_dir="${extract_dir%.tgz}"; extract_dir="${extract_dir%.tar.xz}"
+    extract_dir="${extract_dir%.tar.bz2}"; extract_dir="${extract_dir%.tar.zst}"
+    echo "fake binary" > "$archive_name"
+    # Mirrors build.sh's "raw") case body.
+    extract_dir="${extract_dir}.d"
+    mkdir -p "$extract_dir"
+    mv "$archive_name" "$extract_dir/"
+    [ -f "$extract_dir/$archive_name" ] && [ ! -e "$archive_name" ]
+)
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}✅ PASS${NC}: raw-case extraction avoids the extract_dir/archive_name collision"
+else
+    echo -e "${RED}❌ FAIL${NC}: raw-case extraction collided or lost the file"
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+fi
+rm -rf "$RAWTMP"
+
 echo
 echo "Total: $TESTS_TOTAL, Failed: $TESTS_FAILED"
 [ "$TESTS_FAILED" -eq 0 ]

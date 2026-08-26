@@ -272,6 +272,21 @@ Please check:
                 fi
             fi
             ;;
+        "raw")
+            # No archive - the downloaded file IS the binary (e.g.
+            # jandedobbeleer/oh-my-posh's "posh-linux-amd64", no .tar.*/.zip
+            # wrapper). extract_dir was derived by stripping known archive
+            # suffixes from archive_name, which is a no-op here since there's
+            # no suffix to strip - it would otherwise equal archive_name
+            # itself and collide with the file mkdir is about to create a
+            # directory over. Move the file into a distinctly-named
+            # directory instead so it looks like any other flat single-file
+            # archive to the packaging step that follows (which already
+            # handles that shape for real archives).
+            extract_dir="${extract_dir}.d"
+            mkdir -p "$extract_dir"
+            mv "$archive_name" "$extract_dir/"
+            ;;
         *)
             error "Unsupported archive format: $ARTIFACT_FORMAT"
             ;;

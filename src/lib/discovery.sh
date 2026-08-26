@@ -21,12 +21,25 @@ auto_discover_pattern() {
         return 1
     fi
     
-    # Filter assets by pattern
-    local filtered_assets=$(echo "$assets" | \
-        grep -E "\.(${ARTIFACT_FORMAT:-tar.gz}|tgz|tar\.gz|tar\.xz|tar\.bz2|tar\.zst|zip)$" | \
-        grep -v -i "sha256\|checksum\|source" | \
-        grep -iE "$pattern" | \
-        grep -i "linux" || true)
+    # Filter assets by pattern. "raw" (a bare, unarchived binary - some
+    # goreleaser/cargo-dist configs skip archiving a single-binary release,
+    # e.g. jandedobbeleer/oh-my-posh's "posh-linux-amd64") has no extension
+    # to match, so exclude known non-binary asset types instead of requiring
+    # one.
+    local filtered_assets
+    if [ "$ARTIFACT_FORMAT" = "raw" ]; then
+        filtered_assets=$(echo "$assets" | \
+            grep -viE '\.(tar\.gz|tgz|tar\.xz|tar\.bz2|tar\.zst|zip|deb|rpm|exe|dmg|pkg|txt|md|json|sig|asc|sha256|sha256sum|sha512|sbom)$' | \
+            grep -v -i "sha256\|checksum\|source" | \
+            grep -iE "$pattern" | \
+            grep -i "linux" || true)
+    else
+        filtered_assets=$(echo "$assets" | \
+            grep -E "\.(${ARTIFACT_FORMAT:-tar.gz}|tgz|tar\.gz|tar\.xz|tar\.bz2|tar\.zst|zip)$" | \
+            grep -v -i "sha256\|checksum\|source" | \
+            grep -iE "$pattern" | \
+            grep -i "linux" || true)
+    fi
 
     if [ -z "$filtered_assets" ]; then
         return 1
