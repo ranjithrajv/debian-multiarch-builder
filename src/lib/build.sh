@@ -152,6 +152,9 @@ build_architecture() {
     local extract_dir="${archive_name%.tar.gz}"
     extract_dir="${extract_dir%.zip}"
     extract_dir="${extract_dir%.tgz}"
+    extract_dir="${extract_dir%.tar.xz}"
+    extract_dir="${extract_dir%.tar.bz2}"
+    extract_dir="${extract_dir%.tar.zst}"
 
     # Clean up any previous builds for this architecture
     if [ -d "$extract_dir" ] || [ -f "$archive_name" ]; then
@@ -215,7 +218,7 @@ Please check:
     # Extract the archive based on format (ONCE for all distributions)
     info "Extracting $archive_name..."
     case "$ARTIFACT_FORMAT" in
-        "tar.gz"|"tgz")
+        "tar.gz"|"tgz"|"tar.xz"|"tar.bz2"|"tar.zst")
             # Detect if archive has a top-level subdirectory matching extract_dir.
             # Flat archives (e.g. single binary) are extracted into extract_dir.
             #
@@ -228,19 +231,23 @@ Please check:
             # the build container fails. Requiring the raw tar entry to
             # actually be a directory member (name followed by "/")
             # distinguishes the two cases.
+            #
+            # No -z/-J: GNU tar auto-detects gzip/xz/bzip2/zstd compression
+            # from the archive itself, so one path covers every tar variant
+            # above instead of a per-compression branch.
             local top_raw top_entry top_is_dir=false
-            top_raw=$(tar -tzf "$archive_name" 2>/dev/null | head -1 | sed 's|^\./||')
+            top_raw=$(tar -tf "$archive_name" 2>/dev/null | head -1 | sed 's|^\./||')
             top_entry=$(echo "$top_raw" | sed 's|/.*||')
             case "$top_raw" in
                 "$top_entry"/*) top_is_dir=true ;;
             esac
             if [ "$top_entry" = "$extract_dir" ] && [ "$top_is_dir" = true ]; then
-                if ! tar -xzf "$archive_name" 2>&1; then
+                if ! tar -xf "$archive_name" 2>&1; then
                     error "Failed to extract $archive_name (corrupted archive?)"
                 fi
             else
                 mkdir -p "$extract_dir"
-                if ! tar -xzf "$archive_name" -C "$extract_dir" 2>&1; then
+                if ! tar -xf "$archive_name" -C "$extract_dir" 2>&1; then
                     error "Failed to extract $archive_name (corrupted archive?)"
                 fi
             fi

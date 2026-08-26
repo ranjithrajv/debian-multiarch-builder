@@ -23,7 +23,7 @@ auto_discover_pattern() {
     
     # Filter assets by pattern
     local filtered_assets=$(echo "$assets" | \
-        grep -E "\.(${ARTIFACT_FORMAT:-tar.gz}|tgz|tar\.gz|zip)$" | \
+        grep -E "\.(${ARTIFACT_FORMAT:-tar.gz}|tgz|tar\.gz|tar\.xz|tar\.bz2|tar\.zst|zip)$" | \
         grep -v -i "sha256\|checksum\|source" | \
         grep -iE "$pattern" | \
         grep -i "linux" || true)
@@ -88,6 +88,15 @@ detect_artifact_format() {
         return 0
     elif [[ "$filename" =~ \.tgz$ ]]; then
         echo "tgz"
+        return 0
+    elif [[ "$filename" =~ \.tar\.xz$ ]]; then
+        echo "tar.xz"
+        return 0
+    elif [[ "$filename" =~ \.tar\.bz2$ ]]; then
+        echo "tar.bz2"
+        return 0
+    elif [[ "$filename" =~ \.tar\.zst$ ]]; then
+        echo "tar.zst"
         return 0
     else
         echo "tar.gz"

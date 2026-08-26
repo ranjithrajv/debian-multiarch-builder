@@ -1,7 +1,9 @@
-# Unit Tests - CI Optimization
+# Unit Tests - CI Optimization, Artifact Format Detection
 #
 # Runs test-ci-optimization.sh, which validates CI environment detection
-# and resource-based parallelism logic (src/ci-optimization.sh).
+# and resource-based parallelism logic (src/ci-optimization.sh), and
+# test-format-detection.sh, which validates artifact format detection and
+# extraction (src/lib/discovery.sh, src/lib/build.sh).
 
 name: Test - CI Optimization
 
@@ -22,3 +24,14 @@ jobs:
 
       - name: Run CI optimization tests
         run: bash test-ci-optimization.sh
+
+  test-format-detection:
+    name: Artifact Format Detection Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run artifact format detection tests
+        run: bash test-format-detection.sh

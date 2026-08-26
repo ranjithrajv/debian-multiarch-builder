@@ -71,6 +71,9 @@ verify_checksum() {
     case "$stem" in
         *.tar.gz) stem="${stem%.tar.gz}" ;;
         *.tgz) stem="${stem%.tgz}" ;;
+        *.tar.xz) stem="${stem%.tar.xz}" ;;
+        *.tar.bz2) stem="${stem%.tar.bz2}" ;;
+        *.tar.zst) stem="${stem%.tar.zst}" ;;
         *.zip) stem="${stem%.zip}" ;;
     esac
 
@@ -234,6 +237,9 @@ fetch_checksum_for_asset() {
     case "$asset_stem" in
         *.tar.gz) asset_stem="${asset_stem%.tar.gz}" ;;
         *.tgz) asset_stem="${asset_stem%.tgz}" ;;
+        *.tar.xz) asset_stem="${asset_stem%.tar.xz}" ;;
+        *.tar.bz2) asset_stem="${asset_stem%.tar.bz2}" ;;
+        *.tar.zst) asset_stem="${asset_stem%.tar.zst}" ;;
         *.zip) asset_stem="${asset_stem%.zip}" ;;
     esac
 
