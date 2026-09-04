@@ -3,7 +3,10 @@
 # These are industry-standard patterns
 
 architecture_patterns:
-  amd64: "x86_64|amd64|x64"
+  # "64bit"/"64-bit" covers upstreams that name their x86_64 asset
+  # "Linux-64bit" (e.g. aquasecurity/trivy's trivy_<v>_Linux-64bit.tar.gz);
+  # unlike "x64", the token there has no x prefix.
+  amd64: "x86_64|amd64|x64|64bit|64-bit"
   arm64: "aarch64|arm64"
   # armel is Debian's soft-float ARM port. "eabi([^h]|$)" requires the abi
   # suffix NOT be followed by "hf", so hard-float assets like
