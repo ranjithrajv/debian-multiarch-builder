@@ -156,6 +156,9 @@ build_architecture() {
     extract_dir="${extract_dir%.tar.bz2}"
     extract_dir="${extract_dir%.tar.zst}"
     extract_dir="${extract_dir%.gz}"
+    extract_dir="${extract_dir%.bz2}"
+    extract_dir="${extract_dir%.zst}"
+    extract_dir="${extract_dir%.tar}"
 
     # Clean up any previous builds for this architecture
     if [ -d "$extract_dir" ] || [ -f "$archive_name" ]; then
@@ -296,6 +299,25 @@ Please check:
             mkdir -p "$extract_dir"
             gunzip -c "$archive_name" > "$extract_dir/$(basename "$archive_name" .gz)"
             rm -f "$archive_name"
+            ;;
+        "bz2")
+            # Bzip2-compressed single binary. Decompress in place.
+            extract_dir="${extract_dir}.d"
+            mkdir -p "$extract_dir"
+            bunzip2 -c "$archive_name" > "$extract_dir/$(basename "$archive_name" .bz2)"
+            rm -f "$archive_name"
+            ;;
+        "zst")
+            # Zstandard-compressed single binary. Decompress in place.
+            extract_dir="${extract_dir}.d"
+            mkdir -p "$extract_dir"
+            zstd -d "$archive_name" -o "$extract_dir/$(basename "$archive_name" .zst)"
+            rm -f "$archive_name"
+            ;;
+        "tar")
+            # Uncompressed tar archive.
+            mkdir -p "$extract_dir"
+            tar -xf "$archive_name" -C "$extract_dir"
             ;;
         *)
             error "Unsupported archive format: $ARTIFACT_FORMAT"
