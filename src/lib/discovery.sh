@@ -111,6 +111,9 @@ detect_artifact_format() {
     elif [[ "$filename" =~ \.tar\.zst$ ]]; then
         echo "tar.zst"
         return 0
+    elif [[ "$filename" =~ \.gz$ ]]; then
+        echo "gz"
+        return 0
     else
         echo "tar.gz"
         return 1

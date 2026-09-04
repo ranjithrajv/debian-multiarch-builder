@@ -155,6 +155,7 @@ build_architecture() {
     extract_dir="${extract_dir%.tar.xz}"
     extract_dir="${extract_dir%.tar.bz2}"
     extract_dir="${extract_dir%.tar.zst}"
+    extract_dir="${extract_dir%.gz}"
 
     # Clean up any previous builds for this architecture
     if [ -d "$extract_dir" ] || [ -f "$archive_name" ]; then
@@ -286,6 +287,15 @@ Please check:
             extract_dir="${extract_dir}.d"
             mkdir -p "$extract_dir"
             mv "$archive_name" "$extract_dir/"
+            ;;
+        "gz")
+            # Gzipped single binary (e.g. TomWright/dasel's
+            # "dasel_linux_amd64.gz"). Decompress in place, then treat
+            # like raw - move the decompressed binary into extract_dir.
+            extract_dir="${extract_dir}.d"
+            mkdir -p "$extract_dir"
+            gunzip -c "$archive_name" > "$extract_dir/$(basename "$archive_name" .gz)"
+            rm -f "$archive_name"
             ;;
         *)
             error "Unsupported archive format: $ARTIFACT_FORMAT"
