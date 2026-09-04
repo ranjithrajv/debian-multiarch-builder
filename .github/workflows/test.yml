@@ -22,3 +22,6 @@ jobs:
 
       - name: Run CI optimization tests
         run: bash test-ci-optimization.sh
+
+      - name: Run distribution/base-image tests
+        run: bash test-distributions.sh

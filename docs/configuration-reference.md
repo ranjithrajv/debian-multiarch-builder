@@ -17,12 +17,13 @@ package_name: string           # Name of the Debian package
 github_repo: string            # GitHub repo in format "owner/repo"
 artifact_format: string        # Archive format: "tar.gz", "tgz", or "zip"
 
-# Debian distributions to target (optional, defaults to all)
+# Distributions to target (optional, defaults to all Debian suites)
 debian_distributions:
   - bookworm
   - trixie
   - forky
   - sid
+  - noble                      # Ubuntu suites are accepted here too
 
 # Architecture Configuration (optional, defaults to all)
 # Choose one format
@@ -41,6 +42,34 @@ architectures:
 # Optional: Path to binary within extracted archive
 binary_path: string            # Default: "" (binaries in root)
 ```
+
+#### Ubuntu suites
+
+`debian_distributions` takes Ubuntu codenames alongside Debian ones - the key
+keeps its name for compatibility with existing package definitions. Debian and
+Ubuntu codenames never collide, so the suite name alone selects the vendor:
+
+| | Debian | Ubuntu |
+|---|---|---|
+| Suites | `bullseye` `bookworm` `trixie` `forky` `sid` | `jammy` `noble` `questing` `resolute` |
+| Base image | `debian:<suite>` | `ubuntu:<suite>` (from `base_image` in `system.yaml`) |
+| Architectures | universal + per-arch rules | explicit allowlist per suite |
+| Default | all Debian suites | opt-in only |
+
+Ubuntu's port set is a strict subset of Debian's - no `i386` as a full port
+since 18.04, no `armel`, no `loong64` - so each Ubuntu suite declares its
+architectures explicitly in `system.yaml` and that list is authoritative for
+it. Requesting an architecture outside it skips that build rather than
+failing it, the same as an unsupported Debian arch.
+
+Suites past end of support are dropped from any build, whichever vendor they
+belong to: Debian by its LTS end date, Ubuntu by its end of *standard*
+support (ESM/Pro is a paid extension and does not count). That currently
+removes `bullseye` (ended 2026-08-31) and `questing` (a 9-month interim
+release, ended 2026-07-09) even when a `package.yaml` lists them.
+
+Adding a suite to `debian_distributions` is the only step - the base image,
+architecture set and support window all come from `system.yaml`.
 
 #### overrides.yaml (Optional)
 

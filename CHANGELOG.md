@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - Marketplace Publish Prep
 
 ### Added
+- **Ubuntu suite support**: `debian_distributions` now accepts `jammy`,
+  `noble`, `questing` and `resolute` alongside the Debian suites. The base
+  image is chosen per suite (`base_image_for()` in `lib/config.sh`,
+  `debian:<suite>` unless `system.yaml` names one), passed to both
+  Dockerfiles as the new `BASE_IMAGE` build arg. Ubuntu suites carry an
+  explicit architecture allowlist because their port set is narrower than
+  Debian's, and are dropped past end of *standard* support by the existing
+  EOL filter. Debian builds are unchanged, and the defaults stay Debian-only
+  - Ubuntu is opt-in per package. Covered by `test-distributions.sh`
 - **Validation CI workflow** (`.github/workflows/ci.yml`) that gates every push and PR:
   - `actionlint` linting of all workflow files
   - `shellcheck` at error severity across all shell scripts
@@ -19,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   corrected the `max-parallel` default from `2` to `4`
 - **Docs** `quick-start-guide.md` and `configuration-reference.md` now state the
   `max-parallel` default as `4`
+- **Build success rate** is now measured against the suites actually being
+  built rather than a hardcoded five-suite Debian list, which under-reported
+  any package targeting a subset (and would have mis-scored every Ubuntu
+  build)
 - **Security guide** gained a Provenance Pinning (`pinned-metadata`) section
   documenting the modern per-asset and legacy pin layouts
 

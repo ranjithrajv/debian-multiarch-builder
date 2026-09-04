@@ -140,11 +140,35 @@ get_supported_architectures() {
     fi
 }
 
+# Base image for a suite. Suites carrying an explicit base_image (Ubuntu)
+# use it; everything else is Debian, whose image tag is the suite name.
+base_image_for() {
+    local dist="$1"
+    local image
+    image=$(yq eval ".distributions.details.\"$dist\".base_image // \"\"" \
+        "$SCRIPT_DIR/data/system.yaml" 2>/dev/null)
+    if [ -z "$image" ] || [ "$image" = "null" ]; then
+        image="debian:$dist"
+    fi
+    echo "$image"
+}
+
 # Architecture validation
 is_arch_supported_for_dist() {
     local arch="$1"
     local dist="$2"
-    
+
+    # An explicit per-suite allowlist wins outright - it is the whole port
+    # set for that suite, not an addition to the Debian rules below. Ubuntu
+    # needs this because its ports are a strict subset of Debian's.
+    local allowed
+    allowed=$(yq eval ".distributions.details.\"$dist\".architectures[]" \
+        "$SCRIPT_DIR/data/system.yaml" 2>/dev/null | tr '\n' ' ')
+    if [ -n "$allowed" ] && [ "$allowed" != "null " ]; then
+        echo "$allowed" | grep -qw "$arch" && return 0
+        return 1
+    fi
+
     # Load universal architectures from system configuration
     local universal_archs=$(yq eval '.architecture_support.universal[]' "$SCRIPT_DIR/data/system.yaml" 2>/dev/null | tr '\n' ' ')
     if echo "$universal_archs" | grep -qw "$arch"; then

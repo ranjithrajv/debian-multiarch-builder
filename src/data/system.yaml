@@ -1,13 +1,18 @@
-# System Constants and Debian Official Policies
+# System Constants and Debian/Ubuntu Official Policies
 # These are universal facts that rarely change
-# DO NOT modify unless Debian releases new versions or changes official policies
+# DO NOT modify unless Debian or Ubuntu releases new versions or changes
+# official policies
 
 metadata:
-  last_updated: "2025-01-17"
+  last_updated: "2026-09-04"
   source: "https://wiki.debian.org/SupportedArchitectures"
-  note: "Update when new Debian versions are released"
+  source_ubuntu: "https://wiki.ubuntu.com/Releases"
+  note: "Update when new Debian or Ubuntu versions are released"
 
-# Valid Debian distributions
+# Valid distributions. Suite codenames are the single identifier everywhere -
+# Debian and Ubuntu codenames never collide, so nothing needs to name a
+# vendor. A suite without base_image builds on debian:<suite>; Ubuntu suites
+# set it explicitly. See base_image_for() in lib/config.sh.
 distributions:
   valid:
     - bullseye  # Debian 11 (oldoldstable)
@@ -15,6 +20,10 @@ distributions:
     - trixie    # Debian 13 (testing)
     - forky     # Debian 14 (future)
     - sid       # Debian unstable
+    - jammy     # Ubuntu 22.04 LTS
+    - noble     # Ubuntu 24.04 LTS
+    - questing  # Ubuntu 25.10 (interim)
+    - resolute  # Ubuntu 26.04 LTS
 
   details:
     bullseye:
@@ -52,7 +61,51 @@ distributions:
       security_support_ends: null
       lts_support_ends: null
 
-# Debian Architecture Support Matrix
+    # Ubuntu suites. lts_support_ends carries Ubuntu's END OF STANDARD
+    # SUPPORT (not ESM/Pro, which is a paid extension) so that
+    # filter_expired_distributions() applies one rule to both vendors.
+    # `architectures` is an explicit allowlist: Ubuntu's port set is
+    # narrower than Debian's - no i386 as a full port since 18.04, no
+    # armel, no loong64 - and without it the universal list in
+    # architecture_support would wrongly admit all three.
+    jammy:
+      version: "22.04"
+      status: lts
+      release_date: "2022-04-21"
+      security_support_ends: "2027-04-30"
+      lts_support_ends: "2027-04-30"
+      base_image: "ubuntu:jammy"
+      architectures: [amd64, arm64, armhf, ppc64el, riscv64, s390x]
+
+    noble:
+      version: "24.04"
+      status: lts
+      release_date: "2024-04-25"
+      security_support_ends: "2029-04-30"
+      lts_support_ends: "2029-04-30"
+      base_image: "ubuntu:noble"
+      architectures: [amd64, arm64, armhf, ppc64el, riscv64, s390x]
+
+    questing:
+      version: "25.10"
+      status: interim
+      release_date: "2025-10-09"
+      security_support_ends: "2026-07-09"
+      lts_support_ends: "2026-07-09"  # 9-month interim; already expired
+      base_image: "ubuntu:questing"
+      architectures: [amd64, arm64, armhf, ppc64el, riscv64, s390x]
+
+    resolute:
+      version: "26.04"
+      status: lts
+      release_date: "2026-04-23"
+      security_support_ends: "2031-04-30"
+      lts_support_ends: "2031-04-30"
+      base_image: "ubuntu:resolute"
+      architectures: [amd64, arm64, armhf, ppc64el, riscv64, s390x]
+
+# Architecture Support Matrix (Debian)
+# Ubuntu suites bypass this via details.<suite>.architectures above.
 # Official Debian policies - applied automatically
 architecture_support:
   # Universal architectures (all distributions)

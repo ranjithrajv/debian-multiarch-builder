@@ -1,8 +1,11 @@
 # Enable Docker BuildKit for parallel layer building and better caching
 #syntax=docker/dockerfile:1.6
 
+# Base image is chosen per suite by base_image_for() in lib/config.sh:
+# debian:<suite> unless system.yaml gives the suite a base_image (Ubuntu).
+ARG BASE_IMAGE=debian:bookworm
 ARG DEBIAN_DIST=bookworm
-FROM debian:${DEBIAN_DIST}
+FROM ${BASE_IMAGE}
 
 ARG DEBIAN_DIST
 ARG PACKAGE_NAME
