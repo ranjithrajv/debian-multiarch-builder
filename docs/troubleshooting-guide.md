@@ -400,7 +400,7 @@ For detailed logs, set `parallel_builds: false` to run sequentially — output g
 
    # Copy files to your package repo
    cp debian-multiarch-builder/build.sh .
-   cp debian-multiarch-builder/Dockerfile .
+   cp debian-multiarch-builder/src/Dockerfile .
 
    # Test build
    ./build.sh multiarch-config.yaml 1.0.0 1 amd64
