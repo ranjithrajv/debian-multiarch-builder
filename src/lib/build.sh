@@ -93,15 +93,18 @@ build_distribution() {
         add_failure_detail "Build environment: $(uname -a)"
         add_failure_detail "Docker version: $(docker --version 2>/dev/null || echo 'Docker not available')"
 
-        # Clean up log file
-        rm -f "$docker_build_log" 2>/dev/null || true
+        # Retain the docker build log for post-mortem instead of deleting it:
+        # failed logs are the only way to diagnose silent per-distribution
+        # failures (the worker's own logs are deleted by cleanup below).
+        # action.yml uploads ./failed-build-logs/ as a workflow artifact.
+        mkdir -p failed-build-logs
+        mv -f "$docker_build_log" "failed-build-logs/docker-${dist}-${build_arch}.log" 2>/dev/null || true
 
         return 1
     fi
 
     # Clean up successful build log
     rm -f "$docker_build_log" 2>/dev/null || true
-
     # Extract package using docker create/cp (works with single-stage and scratch images)
     local container_id
     container_id="$(docker create "${PACKAGE_NAME}-${dist}-${build_arch}" / 2>/dev/null || echo "")"
@@ -438,8 +441,15 @@ If binaries are in a subdirectory, add 'binary_path' to your config:
         echo ""
     fi
 
-    # Clean up log files
+    # Clean up log files, retaining logs of failed distributions for the
+    # failed-build-logs artifact (see build_distribution).
     for dist in "${dist_names[@]}"; do
+        for failed in "${failed_dists[@]}"; do
+            if [ "$dist" = "$failed" ] && [ -f "build_${build_arch}_${dist}.log" ]; then
+                mkdir -p failed-build-logs
+                cp -f "build_${build_arch}_${dist}.log" "failed-build-logs/worker-${dist}-${build_arch}.log" 2>/dev/null || true
+            fi
+        done
         rm -f "build_${build_arch}_${dist}.log"
     done
 

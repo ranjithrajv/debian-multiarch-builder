@@ -217,3 +217,11 @@ runs:
         echo "Generated packages: $PACKAGES"
         SOURCE_PACKAGES=$(ls *.dsc 2>/dev/null | tr '\n' ' ' || echo "")
         echo "Generated source packages: $SOURCE_PACKAGES"
+
+    - name: Upload failed build logs
+      if: failure() || cancelled()
+      uses: actions/upload-artifact@v4
+      with:
+        name: failed-build-logs
+        path: failed-build-logs/
+        if-no-files-found: ignore
