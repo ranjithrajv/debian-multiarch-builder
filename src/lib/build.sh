@@ -23,12 +23,23 @@ build_distribution() {
     # Docker build with failure capture
     local docker_build_log="/tmp/docker-build-${dist}-${build_arch}.log"
 
+    # Base image must be computed INLINE here: this code runs inside GNU
+    # parallel workers that do not source config.sh, so helper functions
+    # defined there (e.g. base_image_for_dist) are unavailable and a
+    # command substitution would silently yield an empty BASE_IMAGE,
+    # making the Dockerfile fall back to debian:<suite> even for Ubuntu
+    # suites (observed: debian:jammy not found).
+    local base_image="debian:$dist"
+    case "$dist" in
+        jammy|noble|questing|resolute|plucky|oracular) base_image="ubuntu:$dist" ;;
+    esac
+
     docker build \
         --progress=plain \
         --tag "${PACKAGE_NAME}-${dist}-${build_arch}" \
         --file "$SCRIPT_DIR/Dockerfile" \
         --build-arg DEBIAN_DIST="$dist" \
-        --build-arg BASE_IMAGE="$(base_image_for_dist "$dist")" \
+        --build-arg BASE_IMAGE="$base_image" \
         --build-arg PACKAGE_NAME="$PACKAGE_NAME" \
         --build-arg VERSION="$debian_version" \
         --build-arg BUILD_VERSION="$BUILD_VERSION" \
