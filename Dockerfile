@@ -2,7 +2,14 @@
 #syntax=docker/dockerfile:1.6
 
 ARG DEBIAN_DIST=bookworm
-FROM debian:${DEBIAN_DIST}
+# Base image is derived: Debian suites build FROM debian:<suite>; Ubuntu
+# suites (jammy, noble, ...) build FROM ubuntu:<suite>. build_distribution()
+# passes BASE_IMAGE explicitly; the default keeps standalone Dockerfile
+# builds (docker build --build-arg DEBIAN_DIST=...) working unchanged.
+# NOTE: action.yml copies THIS file over src/Dockerfile before the build,
+# so keep it in sync with src/Dockerfile.
+ARG BASE_IMAGE=debian:${DEBIAN_DIST}
+FROM ${BASE_IMAGE}
 
 ARG DEBIAN_DIST
 ARG PACKAGE_NAME
