@@ -118,6 +118,8 @@ architecture_support:
         - trixie
         - forky
         - sid
+        - noble   # Ubuntu: ports builds since 24.04
+        - resolute
       reason: "Introduced in Trixie (v13)"
       note: "Not available in Bookworm"
 
