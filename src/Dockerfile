@@ -1,5 +1,10 @@
 ARG DEBIAN_DIST=bookworm
-FROM debian:${DEBIAN_DIST}
+# Base image is derived: Debian suites build FROM debian:<suite>; Ubuntu
+# suites (jammy, noble, ...) build FROM ubuntu:<suite>. build_distribution()
+# passes BASE_IMAGE explicitly; the default keeps standalone Dockerfile
+# builds (docker build --build-arg DEBIAN_DIST=...) working unchanged.
+ARG BASE_IMAGE=debian:${DEBIAN_DIST}
+FROM ${BASE_IMAGE}
 
 ARG DEBIAN_DIST
 ARG PACKAGE_NAME

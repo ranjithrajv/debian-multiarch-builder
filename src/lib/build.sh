@@ -28,6 +28,7 @@ build_distribution() {
         --tag "${PACKAGE_NAME}-${dist}-${build_arch}" \
         --file "$SCRIPT_DIR/Dockerfile" \
         --build-arg DEBIAN_DIST="$dist" \
+        --build-arg BASE_IMAGE="$(base_image_for_dist "$dist")" \
         --build-arg PACKAGE_NAME="$PACKAGE_NAME" \
         --build-arg VERSION="$debian_version" \
         --build-arg BUILD_VERSION="$BUILD_VERSION" \

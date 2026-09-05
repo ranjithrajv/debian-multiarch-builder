@@ -70,7 +70,7 @@ generate_build_summary() {
     local attempted_packages=0
     for arch in $(cat /tmp/attempted_architectures.txt 2>/dev/null); do
         local supported_count=0
-        for dist in "bullseye" "bookworm" "trixie" "forky" "sid"; do
+        for dist in $DISTRIBUTIONS; do
             if is_arch_supported_for_dist "$arch" "$dist" 2>/dev/null; then
                 supported_count=$((supported_count + 1))
             fi

@@ -50,6 +50,44 @@ distributions:
       lts_support_ends: null
       description: "Debian unstable (rolling)"
 
+  # Ubuntu suites: opt-in via a package.yaml `ubuntu_distributions` key.
+  # These produce NATIVE ubuntu debs (base image ubuntu:<suite>) for packages
+  # that request them; packages that don't are served from the Debian suite
+  # via the apt-repo's alias fallback instead. Dates are standard-support
+  # (non-ESM) end dates from https://endoflife.date/ubuntu.
+  ubuntu:
+    jammy:
+      version: "22.04"
+      status: "LTS"
+      release_date: "2022-04-21"
+      security_support_ends: null
+      lts_support_ends: "2027-04-30"
+      description: "Ubuntu 22.04 LTS (Jammy Jellyfish)"
+
+    noble:
+      version: "24.04"
+      status: "LTS"
+      release_date: "2024-04-25"
+      security_support_ends: null
+      lts_support_ends: "2029-05-30"
+      description: "Ubuntu 24.04 LTS (Noble Numbat)"
+
+    questing:
+      version: "25.10"
+      status: interim
+      release_date: "2025-10-09"
+      security_support_ends: "2026-07-01"
+      lts_support_ends: "2026-07-01"
+      description: "Ubuntu 25.10 (Questing Quokka) - interim, EOL 2026-07"
+
+    resolute:
+      version: "26.04"
+      status: "LTS"
+      release_date: "2026-04-23"
+      security_support_ends: null
+      lts_support_ends: "2031-04-30"
+      description: "Ubuntu 26.04 LTS (Resolute Raccoon)"
+
 # Default architectures for each distribution
 default_architectures:
   bullseye:
@@ -95,3 +133,34 @@ default_architectures:
     - s390x
     - riscv64
     - loong64
+
+  jammy:
+    - amd64
+    - arm64
+    - armhf
+    - ppc64el
+    - s390x
+
+  noble:
+    - amd64
+    - arm64
+    - armhf
+    - ppc64el
+    - s390x
+    - riscv64  # Ubuntu ports builds available since 24.04
+
+  questing:
+    - amd64
+    - arm64
+    - armhf
+    - ppc64el
+    - s390x
+    - riscv64
+
+  resolute:
+    - amd64
+    - arm64
+    - armhf
+    - ppc64el
+    - s390x
+    - riscv64

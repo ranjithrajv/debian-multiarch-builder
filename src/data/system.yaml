@@ -52,6 +52,36 @@ distributions:
       security_support_ends: null
       lts_support_ends: null
 
+    # Ubuntu suites (opt-in native builds via a package.yaml
+    # `ubuntu_distributions` key), kept in `details` so
+    # filter_expired_distributions() applies to them too: the interim
+    # questing (EOL 2026-07-01) is dropped from native builds automatically
+    # and is served by the apt-repo's alias fallback instead.
+    # Standard-support (non-ESM) dates from endoflife.date/ubuntu.
+    jammy:
+      version: "22.04"
+      status: "LTS"
+      release_date: "2022-04-21"
+      lts_support_ends: "2027-04-30"
+
+    noble:
+      version: "24.04"
+      status: "LTS"
+      release_date: "2024-04-25"
+      lts_support_ends: "2029-05-30"
+
+    questing:
+      version: "25.10"
+      status: interim
+      release_date: "2025-10-09"
+      lts_support_ends: "2026-07-01"
+
+    resolute:
+      version: "26.04"
+      status: "LTS"
+      release_date: "2026-04-23"
+      lts_support_ends: "2031-04-30"
+
 # Debian Architecture Support Matrix
 # Official Debian policies - applied automatically
 architecture_support:

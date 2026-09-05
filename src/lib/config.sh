@@ -90,8 +90,14 @@ parse_config() {
     # `tr -d '[],"'` doesn't strip - it left literal "-" tokens mixed into
     # DISTRIBUTIONS for every package that relies on this default (i.e.
     # every package.yaml that doesn't set debian_distributions itself).
-    DISTRIBUTIONS=$(yq eval '(.debian_distributions // ["bullseye", "bookworm", "trixie", "forky", "sid"])[]' "$package_file")
-    DISTRIBUTIONS=$(echo "$DISTRIBUTIONS" | tr '\n' ' ' | sed 's/ *$//')
+    #
+    # debian_distributions and ubuntu_distributions are separate keys so a
+    # package can opt into native Ubuntu builds without changing its Debian
+    # coverage; Debian-only packages (the default) are unaffected.
+    local debian_dists ubuntu_dists
+    debian_dists=$(yq eval '(.debian_distributions // ["bullseye", "bookworm", "trixie", "forky", "sid"])[]' "$package_file")
+    ubuntu_dists=$(yq eval '(.ubuntu_distributions // [])[]' "$package_file")
+    DISTRIBUTIONS=$( (echo "$debian_dists"; echo "$ubuntu_dists") | tr '\n' ' ' | sed 's/ *$//')
 
     if [ -z "$DISTRIBUTIONS" ]; then
         DISTRIBUTIONS="bullseye bookworm trixie forky sid"
@@ -101,6 +107,27 @@ parse_config() {
     DISTRIBUTIONS=$(filter_expired_distributions "$DISTRIBUTIONS")
 
     info "Configuration loaded successfully"
+}
+
+# Base image for a distribution's docker build: Debian suites build
+# FROM debian:<suite>, Ubuntu suites FROM ubuntu:<suite>. Unknown suites
+# default to debian (previous behavior).
+base_image_for_dist() {
+    local dist="$1"
+    case "$dist" in
+        jammy|noble|questing|resolute|plucky|oracular)
+            echo "ubuntu:$dist" ;;
+        *)
+            echo "debian:$dist" ;;
+    esac
+}
+
+# True when the distribution is an Ubuntu suite.
+is_ubuntu_dist() {
+    case "$1" in
+        jammy|noble|questing|resolute|plucky|oracular) return 0 ;;
+        *) return 1 ;;
+    esac
 }
 
 # Drop any distribution whose lts_support_ends (system.yaml, the canonical
