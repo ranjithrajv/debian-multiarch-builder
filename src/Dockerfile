@@ -73,6 +73,12 @@ RUN mkdir -p /output/usr/bin \
 # fails outright with "cannot copy to non-directory" before the bundle-mode
 # branching below is even reached. Deriving file-only iteration in the
 # non-bundle branch from this same safe copy sidesteps that entirely.
+#
+# Executable = an ELF binary OR an executable file starting with a `#!`
+# shebang (e.g. psviderski/unregistry's docker-pussh, a bash script shipped
+# as the package's only real payload - ELF-only filtering would leave
+# /usr/bin empty and fail the build). Docs and license files never carry
+# both an executable bit and a shebang, so they stay excluded.
 COPY ${BINARY_SOURCE} /tmp/binary-bundle
 # Bundle-mode executable discovery covers two shapes: a bin/ subdirectory
 # (zed.app/{bin,lib,libexec,share}, an FHS-like tree), and executables
@@ -80,27 +86,31 @@ COPY ${BINARY_SOURCE} /tmp/binary-bundle
 # they need (pnpm's Node single-executable-application binary needs its
 # own dist/ alongside it, with no bin/lib/libexec structure at all). Check
 # both rather than requiring upstream's layout to match one specific shape.
-RUN if [ "$BUNDLE" = "true" ]; then \
+RUN installable() { \
+        file -b "$1" | grep -q "^ELF " && return 0; \
+        [ -x "$1" ] && [ "$(head -c 2 "$1")" = "#!" ]; \
+    }; \
+    if [ "$BUNDLE" = "true" ]; then \
         mkdir -p "/output/usr/lib/${PACKAGE_NAME}" \
         && cp -a /tmp/binary-bundle/. "/output/usr/lib/${PACKAGE_NAME}/" \
         && if [ -d "/output/usr/lib/${PACKAGE_NAME}/bin" ]; then \
                for f in "/output/usr/lib/${PACKAGE_NAME}/bin/"*; do \
                    [ -f "$f" ] || continue; \
-                   file -b "$f" | grep -q "^ELF " || continue; \
+                   installable "$f" || continue; \
                    chmod +x "$f"; \
                    ln -s "/usr/lib/${PACKAGE_NAME}/bin/$(basename "$f")" "/output/usr/bin/$(basename "$f")"; \
                done; \
            fi \
         && for f in "/output/usr/lib/${PACKAGE_NAME}/"*; do \
                [ -f "$f" ] || continue; \
-               file -b "$f" | grep -q "^ELF " || continue; \
+               installable "$f" || continue; \
                chmod +x "$f"; \
                ln -s "/usr/lib/${PACKAGE_NAME}/$(basename "$f")" "/output/usr/bin/$(basename "$f")"; \
            done; \
     else \
         for f in /tmp/binary-bundle/*; do \
             [ -f "$f" ] || continue; \
-            file -b "$f" | grep -q "^ELF " && cp "$f" /output/usr/bin/ || true; \
+            installable "$f" && cp "$f" /output/usr/bin/ || true; \
         done \
         && chmod +x /output/usr/bin/* 2>/dev/null || true; \
     fi \
