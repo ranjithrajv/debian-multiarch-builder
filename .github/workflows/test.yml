@@ -1,9 +1,11 @@
-# Unit Tests - CI Optimization, Artifact Format Detection
+# Unit Tests - CI Optimization, Artifact Format Detection, Source Build Config
 #
 # Runs test-ci-optimization.sh, which validates CI environment detection
-# and resource-based parallelism logic (src/ci-optimization.sh), and
+# and resource-based parallelism logic (src/ci-optimization.sh),
 # test-format-detection.sh, which validates artifact format detection and
-# extraction (src/lib/discovery.sh, src/lib/build.sh).
+# extraction (src/lib/discovery.sh, src/lib/build.sh), and
+# test-source-config.sh, which validates build_mode: source config parsing and
+# suite selection (src/lib/config.sh, src/lib/source-build.sh).
 
 name: Test - CI Optimization
 
@@ -35,3 +37,19 @@ jobs:
 
       - name: Run artifact format detection tests
         run: bash test-format-detection.sh
+
+  test-source-config:
+    name: Source Build Config Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Run source build config tests
+        run: bash test-source-config.sh
