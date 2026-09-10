@@ -67,6 +67,26 @@ build_source_distribution() {
 
     local lintian="${LINTIAN_CHECK:-false}"
 
+    # Optional per-suite apt override. build_depends_suites.<suite> names a
+    # source suite (from) and packages to install from it with `apt-get
+    # install -t <from>`; build_apt_sources.<from> supplies that suite's
+    # repository lines. Used when a base suite is too old for a build dep -
+    # e.g. quickshell's trixie build needs forky's wayland-protocols
+    # (ext-background-effect-v1). All absent -> no change.
+    local override_from override_pkgs extra_sources
+    override_from="$(yq eval ".build_depends_suites.\"$dist\".from // \"\"" "$CONFIG_FILE" 2>/dev/null || true)"
+    if [ "$override_from" = "null" ] || [ -z "$override_from" ]; then
+        override_from=""
+    fi
+    override_pkgs="$(yq eval "((.build_depends_suites.\"$dist\".packages // []) | join(\" \"))" "$CONFIG_FILE" 2>/dev/null || true)"
+    if [ "$override_pkgs" = "null" ]; then
+        override_pkgs=""
+    fi
+    extra_sources=""
+    if [ -n "$override_from" ]; then
+        extra_sources="$(yq eval "(.build_apt_sources.\"$override_from\" // []) | .[]" "$CONFIG_FILE" 2>/dev/null || true)"
+    fi
+
     local docker_log="/tmp/source-build-${dist}-${build_arch}.log"
     info "Compiling $PACKAGE_NAME $ref in $base_image ($build_arch)..."
 
@@ -79,14 +99,23 @@ build_source_distribution() {
         PACKAGE_NAME="$1"; FULL_VERSION="$2"; DEB="$3"; ARCH="$4"; SUITE="$5"
         REF="$6"; UPSTREAM_URL="$7"; GITHUB_REPO="$8"; BUILD_DEPS="$9"
         CMAKE_FLAGS="${10}"; MAINTAINER="${11}"; DESCRIPTION="${12}"; LINTIAN="${13}"
+        EXTRA_SOURCES="${14}"; OVERRIDE_FROM="${15}"; OVERRIDE_PKGS="${16}"
 
         export DEBIAN_FRONTEND=noninteractive
+        if [ -n "$EXTRA_SOURCES" ]; then
+            printf "%s\n" "$EXTRA_SOURCES" > /etc/apt/sources.list.d/source-build-extra.list
+        fi
         apt-get update -qq
         # Toolchain is always installed; build_depends adds upstream-specific
         # -dev packages on top.
         apt-get install -y -qq \
             build-essential cmake ninja-build pkg-config file \
             curl ca-certificates dpkg-dev $BUILD_DEPS >/dev/null
+        # Per-suite pins: install these from OVERRIDE_FROM (its repository was
+        # added above), e.g. the forky wayland-protocols on trixie.
+        if [ -n "$OVERRIDE_FROM" ] && [ -n "$OVERRIDE_PKGS" ]; then
+            apt-get install -y -qq -t "$OVERRIDE_FROM" $OVERRIDE_PKGS >/dev/null
+        fi
 
         if [ -n "$UPSTREAM_URL" ]; then
             src_url="${UPSTREAM_URL%/}/archive/${REF}.tar.gz"
@@ -160,7 +189,8 @@ CTRL
         "$PACKAGE_NAME" "$full_version" "$deb" "$build_arch" "$dist" \
         "$ref" "${UPSTREAM_URL:-}" "${GITHUB_REPO:-}" "${BUILD_DEPENDS:-}" \
         "${CMAKE_FLAGS:-}" "$PACKAGE_MAINTAINER" "$PACKAGE_DESCRIPTION" \
-        "$lintian" 2>&1 | tee "$docker_log"
+        "$lintian" "${extra_sources:-}" "${override_from:-}" "${override_pkgs:-}" \
+        2>&1 | tee "$docker_log"
     local rc=${PIPESTATUS[0]}
     if [ "$rc" -ne 0 ]; then
         mkdir -p failed-build-logs
