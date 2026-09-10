@@ -120,7 +120,7 @@ check "oldest suite of an empty list fails" "$got" "fail"
 
 # --- baked image recipe (no Docker) ---------------------------------------
 PACKAGE_NAME=quickshell
-SOURCE_BUILD_IMAGE_RECIPE=2
+SOURCE_BUILD_IMAGE_RECIPE=3
 df_compile="$(source_build_dockerfile "debian:trixie" "compile" "" "" "" "qt6-base-dev libvulkan-dev")"
 df_wrap="$(source_build_dockerfile "debian:forky" "wrap" "" "" "" "qt6-base-dev libvulkan-dev")"
 df_overlay="$(source_build_dockerfile "debian:trixie" "compile" "deb http://deb.debian.org/debian forky main" "forky" "wayland-protocols" "qt6-base-dev")"
@@ -181,6 +181,16 @@ check "chroot dest uses SOURCE_CHROOT_DIR" \
     "$(source_build_chroot_dest srcbld-quickshell-trixie-compile-abcdef123456)" \
     "/tmp/chroot-test/srcbld-quickshell-trixie-compile-abcdef123456"
 unset SOURCE_CHROOT_DIR
+
+ARCH=amd64
+check "requested arch filters to one" \
+    "$(source_build_requested_arches "$(printf 'amd64\narm64')")" "amd64"
+ARCH=all
+check "ARCH=all keeps the full list" \
+    "$(source_build_requested_arches "$(printf 'amd64\narm64')")" "$(printf 'amd64\narm64')"
+unset ARCH
+check "unset ARCH keeps the full list" \
+    "$(source_build_requested_arches "$(printf 'amd64\narm64')")" "$(printf 'amd64\narm64')"
 
 # --- package.yaml parsing (mirrors config.sh) -----------------------------
 TMP="$(mktemp -d)"

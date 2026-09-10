@@ -39,7 +39,7 @@
 SOURCE_BUILD_DEBIAN_ORDER="${SOURCE_BUILD_DEBIAN_ORDER:-bullseye bookworm trixie forky sid}"
 SOURCE_BUILD_UBUNTU_ORDER="${SOURCE_BUILD_UBUNTU_ORDER:-jammy noble oracular plucky questing resolute}"
 # Bump when the Dockerfile recipe changes so saved images are rebuilt.
-SOURCE_BUILD_IMAGE_RECIPE="${SOURCE_BUILD_IMAGE_RECIPE:-2}"
+SOURCE_BUILD_IMAGE_RECIPE="${SOURCE_BUILD_IMAGE_RECIPE:-3}"
 
 # True when the current package opted into a source build.
 source_build_enabled() {
@@ -156,7 +156,7 @@ source_build_architectures() {
 source_build_image_fingerprint() {
     local dist="$1" mode="$2" base_image="$3"
     local extra_sources="$4" override_from="$5" override_pkgs="$6"
-    local build_deps="${7:-${BUILD_DEPS:-}}"
+    local build_deps="${7:-${BUILD_DEPENDS:-}}"
     printf '%s\0' \
         "$SOURCE_BUILD_IMAGE_RECIPE" \
         "$dist" "$mode" "$base_image" \
@@ -235,7 +235,7 @@ source_build_bake_image() {
 
     ctx="$(mktemp -d)"
     source_build_dockerfile "$base_image" "$mode" "$extra_sources" \
-        "$override_from" "$override_pkgs" "${BUILD_DEPS:-}" > "$ctx/Dockerfile"
+        "$override_from" "$override_pkgs" "${BUILD_DEPENDS:-}" > "$ctx/Dockerfile"
     if [ -n "$extra_sources" ]; then
         printf '%s\n' "$extra_sources" > "$ctx/extra.list"
     fi
@@ -804,6 +804,21 @@ source_build_family() {
     done
 }
 
+# One matrix cell per arch: honor the requested architecture instead of
+# building every arch on every runner (which would mislabel e.g. arm64
+# output compiled on an amd64 host). Prints the filtered arch list.
+source_build_requested_arches() {
+    local arches="$1"
+    if [ -n "${ARCH:-}" ] && [ "$ARCH" != "all" ]; then
+        if ! printf '%s\n' "$arches" | grep -qx "$ARCH"; then
+            error "Requested architecture '$ARCH' is not in architectures: ($(echo "$arches" | tr '\n' ' '))" "config_invalid"
+        fi
+        printf '%s' "$ARCH"
+        return 0
+    fi
+    printf '%s' "$arches"
+}
+
 # Entry point for build_mode: source. Replaces the binary orchestration in
 # main.sh; builds every configured suite/arch cell, then emits the Debian
 # source (.dsc) package so apt-get source works, mirroring the binary path.
@@ -819,6 +834,11 @@ run_source_build() {
     if [ "${AUTO_DISCOVERY:-false}" = "true" ] || [ -z "$arches" ]; then
         error "build_mode: source requires an explicit architectures: list in package.yaml" "config_invalid"
     fi
+
+    # One matrix cell per arch: honor the requested architecture instead of
+    # building every arch on every runner (which would mislabel e.g. arm64
+    # output compiled on an amd64 host).
+    arches="$(source_build_requested_arches "$arches")"
 
     local suites
     suites="$(source_build_suites)"
