@@ -62,6 +62,39 @@ build_source_distribution() {
     # The ref to fetch: explicit upstream_ref wins, else the raw version tag.
     local ref="${UPSTREAM_REF:-$VERSION}"
 
+    # Cache the source tarball on the host (defaults to the template's
+    # /tmp/download_cache) so re-runs and the other suites reuse one download
+    # instead of curling inside every container.
+    local dl_cache="${DOWNLOAD_CACHE_DIR:-/tmp/download_cache}"
+    mkdir -p "$dl_cache"
+    local safe_ref="${ref//\//_}"
+    local tarball="${PACKAGE_NAME}-${safe_ref}.tar.gz"
+    local src_url
+    if [ -n "${UPSTREAM_URL:-}" ]; then
+        src_url="${UPSTREAM_URL%/}/archive/${ref}.tar.gz"
+    else
+        src_url="https://github.com/${GITHUB_REPO}/archive/refs/tags/${ref}.tar.gz"
+    fi
+    if [ -s "$dl_cache/$tarball" ]; then
+        info "Using cached source tarball: $tarball"
+    else
+        info "Downloading source: $src_url"
+        if ! curl -fsSL "$src_url" -o "$dl_cache/$tarball.tmp"; then
+            warning "Failed to download source from $src_url"
+            rm -f "$dl_cache/$tarball.tmp"
+            return 1
+        fi
+        mv "$dl_cache/$tarball.tmp" "$dl_cache/$tarball"
+    fi
+
+    # Per-suite apt archive cache. Lives under the same /tmp/download_cache
+    # the scaffold already restores/saves, so it needs no extra workflow step,
+    # and is user-writable (unlike /var/cache/apt/archives). A separate dir per
+    # suite keeps Debian suites from mixing .debs.
+    local apt_cache_root="${SOURCE_APT_ARCHIVE_CACHE_DIR:-$dl_cache/apt}"
+    local apt_cache="$apt_cache_root/$dist"
+    mkdir -p "$apt_cache"
+
     local base_image
     base_image="$(base_image_for_dist "$dist")"
 
@@ -93,13 +126,15 @@ build_source_distribution() {
     docker run --rm \
         -e LINTIAN="$lintian" \
         -v "$PWD:/out" \
+        -v "$dl_cache:/cache:ro" \
+        -v "$apt_cache:/var/cache/apt/archives" \
         -w /build \
         "$base_image" bash -c '
         set -euo pipefail
         PACKAGE_NAME="$1"; FULL_VERSION="$2"; DEB="$3"; ARCH="$4"; SUITE="$5"
         REF="$6"; UPSTREAM_URL="$7"; GITHUB_REPO="$8"; BUILD_DEPS="$9"
         CMAKE_FLAGS="${10}"; MAINTAINER="${11}"; DESCRIPTION="${12}"; LINTIAN="${13}"
-        EXTRA_SOURCES="${14}"; OVERRIDE_FROM="${15}"; OVERRIDE_PKGS="${16}"
+        EXTRA_SOURCES="${14}"; OVERRIDE_FROM="${15}"; OVERRIDE_PKGS="${16}"; TARBALL="${17}"
 
         export DEBIAN_FRONTEND=noninteractive
         if [ -n "$EXTRA_SOURCES" ]; then
@@ -117,15 +152,13 @@ build_source_distribution() {
             apt-get install -y -qq -t "$OVERRIDE_FROM" $OVERRIDE_PKGS >/dev/null
         fi
 
-        if [ -n "$UPSTREAM_URL" ]; then
-            src_url="${UPSTREAM_URL%/}/archive/${REF}.tar.gz"
-        else
-            src_url="https://github.com/${GITHUB_REPO}/archive/refs/tags/${REF}.tar.gz"
-        fi
-        echo "::group::fetch $src_url"
-        curl -fsSL "$src_url" -o /tmp/src.tar.gz
         mkdir -p /src /build /stage
-        tar -xf /tmp/src.tar.gz -C /src --strip-components=1
+        if [ ! -s "/cache/$TARBALL" ]; then
+            echo "ERROR: cached source tarball /cache/$TARBALL missing" >&2
+            exit 1
+        fi
+        echo "::group::extract /cache/$TARBALL"
+        tar -xf "/cache/$TARBALL" -C /src --strip-components=1
         echo "::endgroup::"
 
         cmake -S /src -B /build -G Ninja \
@@ -190,6 +223,7 @@ CTRL
         "$ref" "${UPSTREAM_URL:-}" "${GITHUB_REPO:-}" "${BUILD_DEPENDS:-}" \
         "${CMAKE_FLAGS:-}" "$PACKAGE_MAINTAINER" "$PACKAGE_DESCRIPTION" \
         "$lintian" "${extra_sources:-}" "${override_from:-}" "${override_pkgs:-}" \
+        "$tarball" \
         2>&1 | tee "$docker_log"
     local rc=${PIPESTATUS[0]}
     if [ "$rc" -ne 0 ]; then
