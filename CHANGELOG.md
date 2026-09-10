@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`build_mode: source`** (`config.sh`, `source-build.sh`, `main.sh`): compile
+  upstream source in `debian:<suite>` and wrap the install tree with
+  `dpkg-deb`, for upstreams that publish no Linux binary release (e.g.
+  `quickshell`). Opt-in; the default `build_mode: binary` path is unchanged.
+  Config: `upstream_url`/`upstream_ref` (non-GitHub source host; omit for the
+  GitHub tag tarball), `build_system: cmake`, `build_depends`, `cmake_flags`,
+  `build_suites`/`skip_suites`, and an explicit `architectures:` list. Runtime
+  `Depends` is computed from the shipped ELFs with `dpkg-shlibdeps`. See
+  `examples/source-mode-package.yaml` and issue #3.
+
 ## [v.0.1a25] - 2026-08-26
 
 ### Added

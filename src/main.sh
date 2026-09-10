@@ -220,6 +220,16 @@ parse_config "$CONFIG_FILE"
 fetch_upstream_license
 info "Detected upstream license: $LICENSE_SPDX"
 
+# Source builds take an entirely separate path: there is no release asset to
+# download or architecture to auto-discover, so dispatch before any of the
+# binary-only setup below. build_mode defaults to "binary" - this is a no-op
+# for every existing package.
+if [ "${BUILD_MODE:-binary}" = "source" ]; then
+    source "$SCRIPT_DIR/lib/source-build.sh"
+    run_source_build
+    exit $?
+fi
+
 # If auto-detection was needed and we now have access to discovery functions
 if [ "$ARTIFACT_FORMAT_AUTO_DETECT_NEEDED" = "true" ]; then
     info "Performing artifact format auto-detection..."
