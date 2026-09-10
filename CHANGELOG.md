@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `build_suites`/`skip_suites`, and an explicit `architectures:` list. Runtime
   `Depends` is computed from the shipped ELFs with `dpkg-shlibdeps`. See
   `examples/source-mode-package.yaml` and issue #3.
+- **Per-suite apt override for source builds** (`source-build.sh`):
+  `build_apt_sources.<from>` adds a newer suite's repository and
+  `build_depends_suites.<suite>.{from,packages}` installs packages from it with
+  `apt-get install -t <from>`. Needed when a base suite is too old for a build
+  dependency (quickshell on trixie needs forky's `wayland-protocols`).
 
 ## [v.0.1a25] - 2026-08-26
 

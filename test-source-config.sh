@@ -77,6 +77,14 @@ build_suites:
   - sid
 skip_suites:
   - bookworm
+build_apt_sources:
+  forky:
+    - "deb http://deb.debian.org/debian forky main"
+build_depends_suites:
+  trixie:
+    from: forky
+    packages:
+      - wayland-protocols
 YAML
 
 check "build_mode parses" \
@@ -98,6 +106,18 @@ check "build_suites joins to a space list" \
 check "skip_suites joins to a space list" \
     "$(yq eval '((.skip_suites // []) | join(" "))' "$TMP/source.yaml")" \
     "bookworm"
+
+# Per-suite apt override (mirrors source-build.sh's lookups).
+check "per-suite override 'from' parses (trixie)" \
+    "$(yq eval '.build_depends_suites."trixie".from // ""' "$TMP/source.yaml")" "forky"
+check "per-suite override packages join (trixie)" \
+    "$(yq eval '((.build_depends_suites."trixie".packages // []) | join(" "))' "$TMP/source.yaml")" \
+    "wayland-protocols"
+check "suite without an override yields empty 'from'" \
+    "$(yq eval '.build_depends_suites."forky".from // ""' "$TMP/source.yaml")" ""
+check "apt source line for the override suite (forky)" \
+    "$(yq eval '(.build_apt_sources."forky" // []) | .[]' "$TMP/source.yaml")" \
+    "deb http://deb.debian.org/debian forky main"
 
 # A binary config (no source keys) must default cleanly, not print "null".
 cat > "$TMP/binary.yaml" <<'YAML'

@@ -60,6 +60,21 @@ build_depends:
   - libwayland-bin
   - wayland-protocols
 
+# Per-suite apt override. A base suite that is too old for a build dependency
+# can install it from a newer suite: build_apt_sources.<from> adds that
+# suite's repository, and build_depends_suites.<suite> installs its packages
+# with `apt-get install -t <from>`. Here trixie's wayland-protocols (1.44)
+# predates the staging/ext-background-effect-v1 protocol quickshell requires;
+# forky's copy is Architecture: all, so overlaying it is side-effect-free.
+build_apt_sources:
+  forky:
+    - "deb http://deb.debian.org/debian forky main"
+build_depends_suites:
+  trixie:
+    from: forky
+    packages:
+      - wayland-protocols
+
 cmake_flags:
   - -DCMAKE_BUILD_TYPE=Release
   - -DCRASH_HANDLER=OFF
