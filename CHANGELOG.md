@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   mounted at `/var/cache/apt/archives`. No workflow change is needed - the
   scaffold's existing "Cache upstream downloads" step covers both.
 
+### Fixed
+- **Source build staging**: the container never created `/stage/DEBIAN`, so
+  packaging failed with `/stage/DEBIAN/control: No such file or directory`.
+  Caught by the first real `build_mode: source` run.
+
 ## [v.0.1a25] - 2026-08-26
 
 ### Added
