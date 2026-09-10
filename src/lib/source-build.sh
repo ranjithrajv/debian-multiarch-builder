@@ -152,7 +152,7 @@ build_source_distribution() {
             apt-get install -y -qq -t "$OVERRIDE_FROM" $OVERRIDE_PKGS >/dev/null
         fi
 
-        mkdir -p /src /build /stage
+        mkdir -p /src /build /stage/DEBIAN
         if [ ! -s "/cache/$TARBALL" ]; then
             echo "ERROR: cached source tarball /cache/$TARBALL missing" >&2
             exit 1
