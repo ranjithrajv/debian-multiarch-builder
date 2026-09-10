@@ -192,6 +192,15 @@ unset ARCH
 check "unset ARCH keeps the full list" \
     "$(source_build_requested_arches "$(printf 'amd64\narm64')")" "$(printf 'amd64\narm64')"
 
+# Version field must not carry the _arch suffix (dpkg rejects _ in revision).
+VERSION=v0.3.1 BUILD_VERSION=2
+check "filename version keeps arch suffix" \
+    "$(source_build_versions trixie amd64)" "0.3.1-2+trixie_amd64 0.3.1-2+trixie"
+VERSION=bun-v1.3.14 BUILD_VERSION=1
+check "filename version strips tag prefix" \
+    "$(source_build_versions sid arm64)" "1.3.14-1+sid_arm64 1.3.14-1+sid"
+unset VERSION BUILD_VERSION
+
 # --- package.yaml parsing (mirrors config.sh) -----------------------------
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT

@@ -481,7 +481,10 @@ source_build_ensure_rootfs() {
     fi
     docker rm "$cid" >/dev/null 2>&1 || true
     mkdir -p "$dest/out" "$dest/cache" "$dest/ccache" "$dest/build" "$dest/src"
-    if tar -C "$dest" -czf "$chroot_tar.tmp" .; then
+    # Volatile/runtime dirs (systemd's /run entries are unreadable as a
+    # non-root user) are excluded: the chroot recreates what it needs.
+    if tar -C "$dest" --exclude=./run --exclude=./tmp --exclude=./proc \
+        --exclude=./sys --exclude=./dev -czf "$chroot_tar.tmp" .; then
         mv "$chroot_tar.tmp" "$chroot_tar"
     else
         rm -f "$chroot_tar.tmp"
@@ -511,6 +514,19 @@ source_build_run_in_chroot() {
     esac
 }
 
+# Underscore is legal in the .deb filename but NOT in the Version field,
+# so the arch suffix lives in the filename only (binary path does the
+# same: Version ...+${dist}, file ...+${dist}_${arch}.deb). Prints
+# "<filename-version> <control-version>".
+source_build_versions() {
+    local dist="$1" build_arch="$2"
+    local debian_version
+    debian_version=$(echo "$VERSION" | sed -E 's/^[^0-9]*//')
+    printf '%s %s' \
+        "${debian_version}-${BUILD_VERSION}+${dist}_${build_arch}" \
+        "${debian_version}-${BUILD_VERSION}+${dist}"
+}
+
 # Build one suite/arch cell and leave the .deb in the current directory.
 # mode=compile: cmake in debian:<dist>, export the install tree to stage_rel,
 #   then wrap that suite's .deb.
@@ -523,10 +539,10 @@ build_source_distribution() {
     local stage_rel="${4:-}"
 
     # Debian policy requires the Version field to start with a digit; strip
-    # any non-digit prefix from the upstream tag (v0.3.1 -> 0.3.1).
-    local debian_version
-    debian_version=$(echo "$VERSION" | sed -E 's/^[^0-9]*//')
-    local full_version="${debian_version}-${BUILD_VERSION}+${dist}_${build_arch}"
+    # any non-digit prefix from the upstream tag (v0.3.1 -> 0.3.1). The
+    # underscore arch suffix is filename-only (see source_build_versions).
+    local full_version deb_version
+    read -r full_version deb_version <<< "$(source_build_versions "$dist" "$build_arch")"
     local deb="${PACKAGE_NAME}_${full_version}.deb"
 
     # The ref to fetch: explicit upstream_ref wins, else the raw version tag.
@@ -610,7 +626,7 @@ build_source_distribution() {
     local env_name="cell-${dist}-${mode}.env"
     {
         printf 'export PACKAGE_NAME=%s\n' "$(printf '%q' "$PACKAGE_NAME")"
-        printf 'export FULL_VERSION=%s\n' "$(printf '%q' "$full_version")"
+        printf 'export FULL_VERSION=%s\n' "$(printf '%q' "$deb_version")"
         printf 'export DEB=%s\n' "$(printf '%q' "$deb")"
         printf 'export ARCH=%s\n' "$(printf '%q' "$build_arch")"
         printf 'export SUITE=%s\n' "$(printf '%q' "$dist")"
