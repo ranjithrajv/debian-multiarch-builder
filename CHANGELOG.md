@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `build_depends_suites.<suite>.{from,packages}` installs packages from it with
   `apt-get install -t <from>`. Needed when a base suite is too old for a build
   dependency (quickshell on trixie needs forky's `wayland-protocols`).
+- **Source-build caching** (`source-build.sh`): the upstream source tarball is
+  downloaded once to `/tmp/download_cache` (the scaffold's cached directory)
+  and mounted read-only into every suite/arch container, and apt `.deb`
+  archives are cached per suite under `/tmp/download_cache/apt/<suite>` and
+  mounted at `/var/cache/apt/archives`. No workflow change is needed - the
+  scaffold's existing "Cache upstream downloads" step covers both.
 
 ## [v.0.1a25] - 2026-08-26
 
