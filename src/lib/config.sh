@@ -45,6 +45,24 @@ parse_config() {
     # which a minimal install doesn't pull in on its own).
     DEPENDS=$(yq eval '.depends // ""' "$package_file")
 
+    # Build mode. "binary" (default) repacks an upstream release asset, the
+    # long-standing behavior. "source" compiles upstream source in
+    # debian:<suite> and wraps the install tree - for upstreams that publish
+    # no Linux binaries at all (no release assets to repack). See
+    # source-build.sh and the build_mode: source template.
+    BUILD_MODE=$(yq eval '.build_mode // "binary"' "$package_file")
+
+    # Source-mode fields (only read when build_mode=source; harmless
+    # otherwise). Arrays are joined with spaces so downstream callers can
+    # treat them as plain word lists.
+    UPSTREAM_URL=$(yq eval '.upstream_url // ""' "$package_file")
+    UPSTREAM_REF=$(yq eval '.upstream_ref // ""' "$package_file")
+    BUILD_SYSTEM=$(yq eval '.build_system // "cmake"' "$package_file")
+    BUILD_DEPENDS=$(yq eval '((.build_depends // []) | join(" "))' "$package_file")
+    CMAKE_FLAGS=$(yq eval '((.cmake_flags // []) | join(" "))' "$package_file")
+    BUILD_SUITES=$(yq eval '((.build_suites // []) | join(" "))' "$package_file")
+    SKIP_SUITES=$(yq eval '((.skip_suites // []) | join(" "))' "$package_file")
+
     # Short package description for the control file's Description synopsis.
     # Falls back to a minimal but accurate description (rather than the
     # control template's literal placeholder text) when not configured.

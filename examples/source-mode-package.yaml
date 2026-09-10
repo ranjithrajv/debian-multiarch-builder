@@ -1,0 +1,65 @@
+# Example package.yaml for build_mode: source.
+#
+# Use this when upstream publishes no Linux binary release to repack (the
+# default "binary" mode). The builder fetches the source tag, compiles it in
+# debian:<suite>, and wraps the install tree with dpkg-deb. See source-build.sh
+# and the design discussion in issue #3.
+
+package_name: quickshell
+# Still used for GitHub API reads / tag detection. For a non-GitHub upstream
+# this is the mirror repo; the actual source comes from upstream_url below.
+github_repo: quickshell-mirror/quickshell
+build_mode: source
+build_system: cmake          # only cmake is supported today
+
+# Source host. Forgejo/Gitea-style archive endpoint:
+#   <upstream_url>/archive/<ref>.tar.gz
+# Omit upstream_url to fetch the GitHub tag tarball instead:
+#   https://github.com/<github_repo>/archive/refs/tags/<ref>.tar.gz
+upstream_url: https://git.outfoxxed.me/quickshell/quickshell
+upstream_ref: v0.3.1
+
+description: "Flexible QtQuick based desktop shell toolkit."
+license: LGPL-3.0
+
+# Suites to build from source. build_suites is explicit and takes precedence
+# over debian_distributions; skip_suites is subtracted from it.
+build_suites:
+  - trixie
+  - forky
+  - sid
+skip_suites:
+  - bullseye
+  - bookworm
+
+# Source builds have no release assets to auto-discover, so architectures
+# must be listed explicitly.
+architectures:
+  - amd64
+  - arm64
+
+# Installed on top of the base toolchain (build-essential, cmake, ninja,
+# pkg-config, dpkg-dev).
+build_depends:
+  - qt6-base-dev
+  - qt6-base-private-dev
+  - qt6-declarative-dev
+  - qt6-declarative-private-dev
+  - qt6-shadertools-dev
+  - qt6-svg-dev
+  - qt6-wayland-dev
+  - qt6-wayland-private-dev
+  - libdrm-dev
+  - libgbm-dev
+  - libegl-dev
+  - libglib2.0-dev
+  - libcli11-dev
+  - libvulkan-dev
+  - libxcb1-dev
+  - libwayland-dev
+  - libwayland-bin
+  - wayland-protocols
+
+cmake_flags:
+  - -DCMAKE_BUILD_TYPE=Release
+  - -DCRASH_HANDLER=OFF
