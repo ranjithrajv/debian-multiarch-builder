@@ -100,6 +100,43 @@ The `max_parallel` setting controls the number of concurrent architecture builds
 3.  **`package.yaml`:** The `max_concurrent` field in the `parallel_builds.architectures` section of your `package.yaml` file.
 4.  **Default Value:** If not specified anywhere else, the default value is `2`.
 
+### Source mode (`build_mode: source`)
+
+For upstreams that publish no Linux binary to repack. Opt-in; default remains `binary`. See `examples/source-mode-package.yaml`.
+
+```yaml
+build_mode: source
+build_system: cmake            # cmake only, today
+upstream_url: https://git.example/pkg   # omit to use GitHub tag tarball
+upstream_ref: v1.2.3           # omit to use the workflow `version` input
+build_depends:                 # -dev packages on top of the toolchain
+  - libfoo-dev
+cmake_flags:
+  - -DCMAKE_BUILD_TYPE=Release
+build_suites: [trixie, forky, sid]
+skip_suites: [bullseye, bookworm]
+architectures: [amd64, arm64]  # required; no auto-discovery
+build_apt_sources:
+  forky:
+    - "deb http://deb.debian.org/debian forky main"
+build_depends_suites:
+  trixie:
+    from: forky
+    packages: [wayland-protocols]
+```
+
+What happens: compile once per arch on the oldest suite in each Debian/Ubuntu family, export the install tree, re-wrap newer suites (parallel, capped by `max-parallel`). cmake/shlibdeps run in a chroot (`unshare` → `sudo chroot` → `docker run`). Docker only bakes the image and exports `download_cache/chroots/`. Warm runs unpack that tarball and never talk to Docker.
+
+| Env | Default | Meaning |
+|-----|---------|---------|
+| `SOURCE_BUILD_BACKEND` | `auto` | Force `unshare`, `sudo`, or `docker` |
+| `SOURCE_WRAP_PARALLEL` | `MAX_PARALLEL` or 2 | Concurrent wrap cells |
+| `SOURCE_CCACHE_DIR` | `$DOWNLOAD_CACHE_DIR/ccache` | ccache directory |
+| `SOURCE_CCACHE_MAXSIZE` | `2G` | ccache cap |
+| `SOURCE_CHROOT_DIR` | `$PWD/.source-chroot` | unpacked rootfs |
+
+Compile images include `ccache` and `lld` (`-fuse-ld=mold` if `mold` is on PATH, else `-fuse-ld=lld`). Put `mold` in `build_depends` to prefer it. Native runners only (no QEMU).
+
 ### Architecture Naming
 
 Map Debian architecture names to upstream release artifact patterns:

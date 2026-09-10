@@ -28,6 +28,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   archives are cached per suite under `/tmp/download_cache/apt/<suite>` and
   mounted at `/var/cache/apt/archives`. No workflow change is needed - the
   scaffold's existing "Cache upstream downloads" step covers both.
+- **Compile-once source builds** (`source-build.sh`): compile on the oldest
+  suite per Debian/Ubuntu family (per architecture), export the cmake install
+  tree, and re-wrap it for newer suites with that suite's `dpkg-shlibdeps`.
+  Same shape as the binary path (one blob per arch, N wraps). quickshell
+  amd64 × trixie/forky/sid is one compile plus two wraps, not three compiles.
+  A failed compile skips wraps for that family; wrap-only cells skip the
+  toolchain and the per-suite apt overlay.
+- **Pre-baked source-builder images** (`source-build.sh`): each suite/mode
+  cell `docker build`s a `srcbld-<pkg>-<suite>-<mode>-<hash>` image with the
+  toolchain (compile) or `file`+`dpkg-dev` (wrap) plus `build_depends`, then
+  `docker save`s it under `/tmp/download_cache/images/`. The next run loads
+  that tarball and skips `apt-get install`. Overlay pins are baked into the
+  compile image. Bake failure falls back to installing deps in the container.
+  No workflow change — the scaffold already caches `download_cache`.
+- **ccache on source compiles** (`source-build.sh`): compile images install
+  `ccache`; the cell mounts `/tmp/download_cache/ccache` and passes
+  `CMAKE_C_COMPILER_LAUNCHER`/`CMAKE_CXX_COMPILER_LAUNCHER`. Same-tag rebuilds
+  are cache hits; `restore-keys: download-<pkg>-` carries the cache across
+  version bumps. Stats are printed in a `ccache stats` log group.
+- **Parallel source wraps** (`source-build.sh`): after the single compile,
+  wrap images are baked sequentially (two Qt-sized `docker build`s must not
+  OOM a runner), then wrap cells run concurrently via bash `wait -n`, capped
+  by `SOURCE_WRAP_PARALLEL` or `MAX_PARALLEL` (default 2). A single wrap
+  stays sequential. Per-cell logs are replayed in start order.
+- **Chroot compile (no `docker run`)** (`source-build.sh`): cmake and
+  `dpkg-shlibdeps` run in a Debian chroot (`unshare --map-root-user` if user
+  namespaces work, else `sudo chroot`, else `docker run`). Docker only bakes
+  the image and exports `download_cache/chroots/<tag>.tar.gz`. A warm run
+  unpacks that tarball and never talks to Docker. `SOURCE_BUILD_BACKEND`
+  forces `unshare`, `sudo`, or `docker`.
+- **lld (mold if present) on source compiles** (`source-build.sh`): compile
+  images install `lld`; cmake gets `-fuse-ld=mold` when `mold` is on PATH
+  (opt-in via `build_depends`) otherwise `-fuse-ld=lld`. Recipe version
+  bumped to 2 so existing baked images rebuild.
+- **No duplicate image tarball** (`source-build.sh`): stop `docker save` to
+  `download_cache/images/` — the chroot tarball is the cache. A leftover
+  `images/*.tar.gz` is still loaded if the chroot tarball is missing.
 
 ### Fixed
 - **Source build staging**: the container never created `/stage/DEBIAN`, so

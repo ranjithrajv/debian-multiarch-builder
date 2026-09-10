@@ -56,9 +56,143 @@ BUILD_SUITES=""; SKIP_SUITES=""; DISTRIBUTIONS="trixie sid"
 check "no skip_suites keeps the full suite list" \
     "$(source_build_suites)" "trixie sid"
 
+# --- compile-once plan (oldest suite + wrap the rest) ---------------------
+check "oldest of trixie/forky/sid is trixie" \
+    "$(source_build_oldest_suite "trixie forky sid")" "trixie"
+check "oldest of sid/forky is forky" \
+    "$(source_build_oldest_suite "sid forky")" "forky"
+check "single suite compiles on itself" \
+    "$(source_build_oldest_suite "sid")" "sid"
+check "oldest of forky/trixie/bookworm is bookworm" \
+    "$(source_build_oldest_suite "forky trixie bookworm")" "bookworm"
+check "unknown suite names fall back to the first entry" \
+    "$(source_build_oldest_suite "foo bar")" "foo"
+check "oldest Ubuntu of noble/jammy is jammy" \
+    "$(source_build_oldest_suite "noble jammy")" "jammy"
+
+check "wrap suites drop the compile suite" \
+    "$(source_build_wrap_suites "trixie forky sid" "trixie")" "forky sid"
+check "wrap suites empty when only the compile suite is present" \
+    "$(source_build_wrap_suites "trixie" "trixie")" ""
+
+source_build_wrap_is_parallel "forky sid" && got=yes || got=no
+check "two wrap suites run in parallel" "$got" "yes"
+source_build_wrap_is_parallel "forky" && got=yes || got=no
+check "one wrap suite stays sequential" "$got" "no"
+source_build_wrap_is_parallel "" && got=yes || got=no
+check "empty wrap list stays sequential" "$got" "no"
+
+unset SOURCE_WRAP_PARALLEL MAX_PARALLEL
+check "wrap parallel default is 2" "$(source_build_wrap_parallel_limit)" "2"
+MAX_PARALLEL=4
+check "wrap parallel follows MAX_PARALLEL" "$(source_build_wrap_parallel_limit)" "4"
+SOURCE_WRAP_PARALLEL=3
+MAX_PARALLEL=8
+check "SOURCE_WRAP_PARALLEL wins over MAX_PARALLEL" "$(source_build_wrap_parallel_limit)" "3"
+SOURCE_WRAP_PARALLEL=0
+check "wrap parallel floor is 1" "$(source_build_wrap_parallel_limit)" "1"
+SOURCE_WRAP_PARALLEL=bogus
+check "non-numeric wrap parallel falls back to 2" "$(source_build_wrap_parallel_limit)" "2"
+unset SOURCE_WRAP_PARALLEL MAX_PARALLEL
+
+SOURCE_BUILD_BACKEND=docker
+check "backend override docker" "$(source_build_resolve_backend)" "docker"
+SOURCE_BUILD_BACKEND=unshare
+check "backend override unshare" "$(source_build_resolve_backend)" "unshare"
+SOURCE_BUILD_BACKEND=sudo
+check "backend override sudo" "$(source_build_resolve_backend)" "sudo"
+unset SOURCE_BUILD_BACKEND
+case "$(source_build_resolve_backend)" in
+    unshare|sudo|docker) got=yes ;;
+    *) got=no ;;
+esac
+check "auto backend is unshare, sudo, or docker" "$got" "yes"
+
+check "debian filter drops Ubuntu suites" \
+    "$(source_build_filter_debian "trixie jammy sid noble")" "trixie sid"
+check "ubuntu filter drops Debian suites" \
+    "$(source_build_filter_ubuntu "trixie jammy sid noble")" "jammy noble"
+check "debian filter of Ubuntu-only is empty" \
+    "$(source_build_filter_debian "jammy noble")" ""
+
+source_build_oldest_suite "" >/dev/null && got=ok || got=fail
+check "oldest suite of an empty list fails" "$got" "fail"
+
+# --- baked image recipe (no Docker) ---------------------------------------
+PACKAGE_NAME=quickshell
+SOURCE_BUILD_IMAGE_RECIPE=2
+df_compile="$(source_build_dockerfile "debian:trixie" "compile" "" "" "" "qt6-base-dev libvulkan-dev")"
+df_wrap="$(source_build_dockerfile "debian:forky" "wrap" "" "" "" "qt6-base-dev libvulkan-dev")"
+df_overlay="$(source_build_dockerfile "debian:trixie" "compile" "deb http://deb.debian.org/debian forky main" "forky" "wayland-protocols" "qt6-base-dev")"
+
+echo "$df_compile" | grep -q ccache && got=yes || got=no
+check "compile dockerfile installs ccache" "$got" "yes"
+echo "$df_compile" | grep -q ' ccache lld' && got=yes || got=no
+check "compile dockerfile installs lld" "$got" "yes"
+echo "$df_wrap" | grep -q lld && got=yes || got=no
+check "wrap dockerfile does not install lld" "$got" "no"
+echo "$df_compile" | grep -q cmake && got=yes || got=no
+check "compile dockerfile installs cmake" "$got" "yes"
+echo "$df_compile" | grep -q qt6-base-dev && got=yes || got=no
+check "compile dockerfile installs build_depends" "$got" "yes"
+echo "$df_compile" | grep -q 'COPY extra.list' && got=yes || got=no
+check "compile dockerfile omits extra.list when there is no overlay" "$got" "no"
+
+echo "$df_wrap" | grep -q ccache && got=yes || got=no
+check "wrap dockerfile does not install ccache" "$got" "no"
+echo "$df_wrap" | grep -q cmake && got=yes || got=no
+check "wrap dockerfile does not install cmake" "$got" "no"
+echo "$df_wrap" | grep -q build-essential && got=yes || got=no
+check "wrap dockerfile does not install build-essential" "$got" "no"
+echo "$df_wrap" | grep -q 'file dpkg-dev' && got=yes || got=no
+check "wrap dockerfile installs file and dpkg-dev" "$got" "yes"
+echo "$df_wrap" | grep -q qt6-base-dev && got=yes || got=no
+check "wrap dockerfile still installs build_depends for shlibdeps" "$got" "yes"
+
+echo "$df_overlay" | grep -q 'COPY extra.list' && got=yes || got=no
+check "overlay dockerfile copies extra.list" "$got" "yes"
+echo "$df_overlay" | grep -q -- '-t forky wayland-protocols' && got=yes || got=no
+check "overlay dockerfile pins override packages" "$got" "yes"
+
+fp_a="$(source_build_image_fingerprint trixie compile debian:trixie "" "" "" "qt6-base-dev")"
+fp_b="$(source_build_image_fingerprint trixie compile debian:trixie "" "" "" "qt6-base-dev")"
+fp_c="$(source_build_image_fingerprint trixie compile debian:trixie "" "" "" "qt6-base-dev libvulkan-dev")"
+fp_d="$(source_build_image_fingerprint trixie wrap debian:trixie "" "" "" "qt6-base-dev")"
+check "fingerprint is stable for the same inputs" "$fp_a" "$fp_b"
+[ "$fp_a" != "$fp_c" ] && got=yes || got=no
+check "fingerprint changes when build_depends change" "$got" "yes"
+[ "$fp_a" != "$fp_d" ] && got=yes || got=no
+check "fingerprint changes between compile and wrap" "$got" "yes"
+
+check "image tag format" \
+    "$(source_build_image_tag trixie compile abcdef1234567890)" \
+    "srcbld-quickshell-trixie-compile-abcdef123456"
+
+DOWNLOAD_CACHE_DIR=/tmp/dl-cache-test
+check "image tar lives under download_cache/images" \
+    "$(source_build_image_tar srcbld-quickshell-trixie-compile-abcdef123456)" \
+    "/tmp/dl-cache-test/images/srcbld-quickshell-trixie-compile-abcdef123456.tar.gz"
+check "chroot tar lives under download_cache/chroots" \
+    "$(source_build_chroot_tar srcbld-quickshell-trixie-compile-abcdef123456)" \
+    "/tmp/dl-cache-test/chroots/srcbld-quickshell-trixie-compile-abcdef123456.tar.gz"
+unset DOWNLOAD_CACHE_DIR
+SOURCE_CHROOT_DIR=/tmp/chroot-test
+check "chroot dest uses SOURCE_CHROOT_DIR" \
+    "$(source_build_chroot_dest srcbld-quickshell-trixie-compile-abcdef123456)" \
+    "/tmp/chroot-test/srcbld-quickshell-trixie-compile-abcdef123456"
+unset SOURCE_CHROOT_DIR
+
 # --- package.yaml parsing (mirrors config.sh) -----------------------------
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
+
+source_build_write_inner_script "$TMP/inner.sh"
+source_build_write_enter_chroot "$TMP/enter-chroot.sh"
+bash -n "$TMP/inner.sh" && got=ok || got=fail
+check "inner.sh is valid bash" "$got" "ok"
+bash -n "$TMP/enter-chroot.sh" && got=ok || got=fail
+check "enter-chroot.sh is valid bash" "$got" "ok"
+
 cat > "$TMP/source.yaml" <<'YAML'
 package_name: quickshell
 github_repo: quickshell-mirror/quickshell

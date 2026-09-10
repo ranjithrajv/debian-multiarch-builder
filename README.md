@@ -115,6 +115,7 @@ Go to the **Actions** tab in your GitHub repository, select the workflow, and cl
 *   **🚀 Auto-Discovery Mode** - Build from any GitHub repo without configuration
 *   **🧙 Setup Wizard** - Interactive wizard generates config automatically  
 *   **⚡ 80% Faster Builds** - Multi-level parallelization and intelligent caching
+*   **🧱 Source mode** - `build_mode: source` compiles upstreams with no Linux binary (cmake, compile-once, ccache, chroot)
 *   **🔒 Secure by Default** - Automatic checksum verification for all downloads
 *   **✅ Quality Assurance** - Built-in Lintian integration for package validation
 *   **📊 Real-time Progress** - Live build status with architecture-level tracking

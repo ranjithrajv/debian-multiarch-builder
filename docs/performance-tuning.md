@@ -60,3 +60,18 @@ parallel_builds:
 - **Download Caching**: Previously downloaded 4× per architecture (once per distribution), now downloads once
 - **Parallel Distributions**: Previously built distributions sequentially, now builds all 4 simultaneously
 - **Combined Effect**: Reduces per-architecture build time from ~4 minutes to ~1 minute
+
+## Source mode (`build_mode: source`)
+
+Binary re-pack is download-once × wrap-N. Source mode is shaped the same after compile-once: one cmake per arch on the oldest suite, then parallel wraps.
+
+| Lever | What it avoids |
+|-------|----------------|
+| Compile-once | Recompiling the same tree per suite |
+| Baked image + chroot tarball | `apt-get install` of Qt-sized `build_depends` on every cell |
+| ccache under `download_cache/ccache` | Full rebuild of unchanged TUs |
+| lld (mold if present) | bfd link time |
+| Parallel wraps (`SOURCE_WRAP_PARALLEL` / `max-parallel`) | Sequential `dpkg-shlibdeps` after the compile |
+| Chroot (`unshare`) | `docker run` on the cmake hot path |
+
+Warm run (cache hit on `download_cache/chroots/` + ccache): unpack rootfs, incremental cmake, wrap. Cold run still pays one `docker build` per suite to produce the chroot tarball. Do not raise wrap parallelism on a first-run bake — wrap images are baked sequentially on purpose so two Qt-sized builds cannot OOM a 7 GB runner.
