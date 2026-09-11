@@ -10,7 +10,8 @@ src/
 │   ├── github-api.sh     # GitHub API interactions
 │   ├── discovery.sh # Architecture pattern discovery
 │   ├── validation.sh     # Release and checksum validation
-│   ├── build.sh          # Core build functions
+│   ├── build.sh          # Core build functions (binary re-pack)
+│   ├── source-build.sh   # build_mode: source (compile-once, chroot, wrap)
 │   ├── orchestration.sh  # Build orchestration (parallel and sequential)
 │   └── summary.sh        # Build summary generation
 ├── system.yaml           # System constants and Debian official policies

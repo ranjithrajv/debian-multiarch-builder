@@ -1,9 +1,11 @@
 # Example package.yaml for build_mode: source.
 #
 # Use this when upstream publishes no Linux binary release to repack (the
-# default "binary" mode). The builder fetches the source tag, compiles it in
-# debian:<suite>, and wraps the install tree with dpkg-deb. See source-build.sh
-# and the design discussion in issue #3.
+# default "binary" mode). The builder fetches the source tag, bakes a per-suite
+# image, exports a chroot tarball under download_cache/chroots/, compiles once
+# in that chroot (unshare/chroot, not docker run) with ccache, and re-wraps
+# that install tree for every newer suite with dpkg-deb. See source-build.sh
+# and issue #3.
 
 package_name: quickshell
 # Still used for GitHub API reads / tag detection. For a non-GitHub upstream
