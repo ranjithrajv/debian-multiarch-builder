@@ -120,7 +120,7 @@ check "oldest suite of an empty list fails" "$got" "fail"
 
 # --- baked image recipe (no Docker) ---------------------------------------
 PACKAGE_NAME=quickshell
-SOURCE_BUILD_IMAGE_RECIPE=3
+SOURCE_BUILD_IMAGE_RECIPE=4
 df_compile="$(source_build_dockerfile "debian:trixie" "compile" "" "" "" "qt6-base-dev libvulkan-dev")"
 df_wrap="$(source_build_dockerfile "debian:forky" "wrap" "" "" "" "qt6-base-dev libvulkan-dev")"
 df_overlay="$(source_build_dockerfile "debian:trixie" "compile" "deb http://deb.debian.org/debian forky main" "forky" "wayland-protocols" "qt6-base-dev")"
@@ -153,6 +153,16 @@ echo "$df_overlay" | grep -q 'COPY extra.list' && got=yes || got=no
 check "overlay dockerfile copies extra.list" "$got" "yes"
 echo "$df_overlay" | grep -q -- '-t forky wayland-protocols' && got=yes || got=no
 check "overlay dockerfile pins override packages" "$got" "yes"
+echo "$df_overlay" | grep -q 'COPY extra-pin.pref' && got=yes || got=no
+check "overlay dockerfile copies the suite pin" "$got" "yes"
+# Base install must precede the overlay COPY: otherwise apt resolves every
+# build dep at the newer suite's version (observed: forky Qt in a trixie build).
+base_line="$(echo "$df_overlay" | grep -n 'apt-get install -y build-essential' | cut -d: -f1)"
+copy_line="$(echo "$df_overlay" | grep -n 'COPY extra.list' | cut -d: -f1)"
+[ "$base_line" -lt "$copy_line" ] && got=yes || got=no
+check "overlay dockerfile installs base deps before adding overlay sources" "$got" "yes"
+check "overlay pin pins the overlay suite at 100" \
+    "$(source_build_overlay_pin forky)" "$(printf 'Package: *\nPin: release n=forky\nPin-Priority: 100')"
 
 fp_a="$(source_build_image_fingerprint trixie compile debian:trixie "" "" "" "qt6-base-dev")"
 fp_b="$(source_build_image_fingerprint trixie compile debian:trixie "" "" "" "qt6-base-dev")"

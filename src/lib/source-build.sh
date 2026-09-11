@@ -39,7 +39,7 @@
 SOURCE_BUILD_DEBIAN_ORDER="${SOURCE_BUILD_DEBIAN_ORDER:-bullseye bookworm trixie forky sid}"
 SOURCE_BUILD_UBUNTU_ORDER="${SOURCE_BUILD_UBUNTU_ORDER:-jammy noble oracular plucky questing resolute}"
 # Bump when the Dockerfile recipe changes so saved images are rebuilt.
-SOURCE_BUILD_IMAGE_RECIPE="${SOURCE_BUILD_IMAGE_RECIPE:-3}"
+SOURCE_BUILD_IMAGE_RECIPE="${SOURCE_BUILD_IMAGE_RECIPE:-4}"
 
 # True when the current package opted into a source build.
 source_build_enabled() {
@@ -178,29 +178,45 @@ source_build_image_tar() {
 }
 
 # Dockerfile for a source-builder image. extra_sources non-empty means the
-# build context must contain extra.list (COPY'd into apt sources).
+# build context must contain extra.list (COPY'd into apt sources) and
+# extra-pin.pref (pins the overlay suite below the base suite so only the
+# explicit -t packages come from it; without the pin apt would resolve every
+# build dep at the newer suite's version and the binary would not install on
+# the base suite it is labeled for).
 source_build_dockerfile() {
     local base_image="$1" mode="$2" extra_sources="$3"
     local override_from="$4" override_pkgs="$5" build_deps="$6"
 
-    printf 'FROM %s\n' "$base_image"
-    printf 'ENV DEBIAN_FRONTEND=noninteractive\n'
-    if [ -n "$extra_sources" ]; then
-        printf 'COPY extra.list /etc/apt/sources.list.d/source-build-extra.list\n'
-    fi
-    printf 'RUN apt-get update -qq && apt-get install -y'
+    local base_pkgs
     if [ "$mode" = "wrap" ]; then
-        printf ' file dpkg-dev'
+        base_pkgs="file dpkg-dev"
     else
-        printf ' build-essential cmake ninja-build pkg-config file curl ca-certificates dpkg-dev ccache lld'
+        base_pkgs="build-essential cmake ninja-build pkg-config file curl ca-certificates dpkg-dev ccache lld"
     fi
     if [ -n "$build_deps" ]; then
-        printf ' %s' "$build_deps"
+        base_pkgs="$base_pkgs $build_deps"
     fi
-    if [ -n "$override_from" ] && [ -n "$override_pkgs" ]; then
-        printf ' && apt-get install -y -t %s %s' "$override_from" "$override_pkgs"
+
+    printf 'FROM %s\n' "$base_image"
+    printf 'ENV DEBIAN_FRONTEND=noninteractive\n'
+    printf 'RUN apt-get update -qq && apt-get install -y %s && rm -rf /var/lib/apt/lists/*\n' "$base_pkgs"
+    if [ -n "$extra_sources" ]; then
+        printf 'COPY extra.list /etc/apt/sources.list.d/source-build-extra.list\n'
+        printf 'COPY extra-pin.pref /etc/apt/preferences.d/source-build-extra\n'
+        printf 'RUN apt-get update -qq'
+        if [ -n "$override_from" ] && [ -n "$override_pkgs" ]; then
+            printf ' && apt-get install -y -t %s %s' "$override_from" "$override_pkgs"
+        fi
+        printf ' && rm -rf /var/lib/apt/lists/*\n'
     fi
-    printf ' && rm -rf /var/lib/apt/lists/*\n'
+}
+
+# Apt preferences pin for an overlay suite: everything from it stays at
+# priority 100 (below the base suite's 500), so `apt-get install -t` still
+# pulls the named packages but nothing else drifts to the newer suite.
+source_build_overlay_pin() {
+    local override_from="$1"
+    printf 'Package: *\nPin: release n=%s\nPin-Priority: 100\n' "$override_from"
 }
 
 # Bake (or load) the per-suite image. Prints the docker tag on stdout.
@@ -238,6 +254,7 @@ source_build_bake_image() {
         "$override_from" "$override_pkgs" "${BUILD_DEPENDS:-}" > "$ctx/Dockerfile"
     if [ -n "$extra_sources" ]; then
         printf '%s\n' "$extra_sources" > "$ctx/extra.list"
+        source_build_overlay_pin "$override_from" > "$ctx/extra-pin.pref"
     fi
 
     info "Baking $tag"
@@ -290,9 +307,10 @@ source_build_write_inner_script() {
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 if [ "${SOURCE_BUILD_BAKED:-}" != "1" ]; then
-    if [ -n "${EXTRA_SOURCES:-}" ]; then
-        printf "%s\n" "$EXTRA_SOURCES" > /etc/apt/sources.list.d/source-build-extra.list
-    fi
+    # Base-suite packages first; the overlay suite is pinned below the base
+    # suite so only the explicit -t packages come from it (see
+    # source_build_overlay_pin). Installing everything after adding the
+    # overlay sources would resolve build deps at the newer suite's version.
     apt-get update -qq
     if [ "${MODE:-compile}" = "wrap" ]; then
         apt-get install -y -qq file dpkg-dev $BUILD_DEPS >/dev/null
@@ -300,6 +318,12 @@ if [ "${SOURCE_BUILD_BAKED:-}" != "1" ]; then
         apt-get install -y -qq \
             build-essential cmake ninja-build pkg-config file \
             curl ca-certificates dpkg-dev ccache lld $BUILD_DEPS >/dev/null
+    fi
+    if [ -n "${EXTRA_SOURCES:-}" ]; then
+        printf "%s\n" "$EXTRA_SOURCES" > /etc/apt/sources.list.d/source-build-extra.list
+        printf 'Package: *\nPin: release n=%s\nPin-Priority: 100\n' "${OVERRIDE_FROM:-}" \
+            > /etc/apt/preferences.d/source-build-extra
+        apt-get update -qq
         if [ -n "${OVERRIDE_FROM:-}" ] && [ -n "${OVERRIDE_PKGS:-}" ]; then
             apt-get install -y -qq -t "$OVERRIDE_FROM" $OVERRIDE_PKGS >/dev/null
         fi
