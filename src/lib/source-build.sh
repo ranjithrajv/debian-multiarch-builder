@@ -876,7 +876,15 @@ run_source_build() {
         error "No packages were built from source" "source_build_failed"
     fi
     [ "$failed" -eq 0 ] || warning "$failed source build cell(s) failed"
-    [ "$failed" -eq 0 ] && rm -rf .source-stage .source-chroot
+    # Chroot files may be root-owned (sudo backend); escalate the removal
+    # and never let cleanup fail the build (main.sh runs under set -e).
+    rm -rf .source-stage 2>/dev/null || true
+    if [ "$failed" -eq 0 ]; then
+        if ! rm -rf .source-chroot 2>/dev/null; then
+            sudo rm -rf .source-chroot 2>/dev/null \
+                || warning "Could not remove .source-chroot (root-owned leftovers)"
+        fi
+    fi
 
     ls -lh ${PACKAGE_NAME}_*.deb 2>/dev/null | awk '{print "  " $9 " (" $5 ")"}' || true
 
