@@ -157,18 +157,28 @@ source_build_image_fingerprint() {
     local dist="$1" mode="$2" base_image="$3"
     local extra_sources="$4" override_from="$5" override_pkgs="$6"
     local build_deps="${7:-${BUILD_DEPENDS:-}}"
+    local build_arch="${8:-}"
+    # build_arch must be part of the key. base_image_for_dist is arch-less
+    # ("debian:trixie"), so without this the fingerprint is identical for
+    # amd64 and arm64, the first arch to run bakes the chroot and the second
+    # one reuses it - and compiles against the first arch's toolchain. That
+    # is how quickshell's "_arm64" packages came to contain x86-64 binaries.
     printf '%s\0' \
         "$SOURCE_BUILD_IMAGE_RECIPE" \
-        "$dist" "$mode" "$base_image" \
+        "$dist" "$mode" "$base_image" "$build_arch" \
         "$build_deps" "$extra_sources" "$override_from" "$override_pkgs" \
         | sha256sum | awk '{print $1}'
 }
 
 source_build_image_tag() {
     local dist="$1" mode="$2" fp="$3"
-    local pkg
+    local pkg build_arch
     pkg="$(printf '%s' "${PACKAGE_NAME:-pkg}" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9._-')"
-    printf 'srcbld-%s-%s-%s-%s' "$pkg" "$dist" "$mode" "${fp:0:12}"
+    # Arch in the tag too, so the two arches get separate chroot dests even
+    # if a fingerprint ever collides.
+    build_arch="$(printf '%s' "${SOURCE_BUILD_ARCH:-}" | tr -cd 'a-z0-9._-')"
+    printf 'srcbld-%s-%s-%s-%s%s' "$pkg" "$dist" "$mode" \
+        "${build_arch:+-$build_arch}" "${fp:0:12}"
 }
 
 source_build_image_tar() {
@@ -485,11 +495,13 @@ ENTER
 # Bake (if needed), export a chroot tarball, unpack to dest. Prints dest.
 source_build_ensure_rootfs() {
     local dist="$1" mode="$2" extra_sources="$3" override_from="$4" override_pkgs="$5"
+    local build_arch="${6:-}"
     local base_image fp tag chroot_tar dest cid image
 
+    SOURCE_BUILD_ARCH="$build_arch"
     base_image="$(base_image_for_dist "$dist")"
     fp="$(source_build_image_fingerprint "$dist" "$mode" "$base_image" \
-        "$extra_sources" "$override_from" "$override_pkgs")"
+        "$extra_sources" "$override_from" "$override_pkgs" "" "$build_arch")"
     tag="$(source_build_image_tag "$dist" "$mode" "$fp")"
     SOURCE_BUILD_LAST_TAG="$tag"
     chroot_tar="$(source_build_chroot_tar "$tag")"
@@ -688,7 +700,7 @@ build_source_distribution() {
     backend="$(source_build_resolve_backend)"
     SOURCE_BUILD_LAST_TAG=""
     SOURCE_BUILD_LAST_DEST=""
-    if dest="$(source_build_ensure_rootfs "$dist" "$mode" "$extra_sources" "$override_from" "$override_pkgs")"; then
+    if dest="$(source_build_ensure_rootfs "$dist" "$mode" "$extra_sources" "$override_from" "$override_pkgs" "$build_arch")"; then
         baked=1
         SOURCE_BUILD_LAST_DEST="$dest"
     else
@@ -763,11 +775,11 @@ build_source_distribution() {
 
 # Unpack wrap chroots one suite at a time so parallel wrap cells only enter them.
 source_build_prebake_wrap_images() {
-    local suite
+    local suite build_arch="$2"
     for suite in $1; do
-        info "Pre-baking wrap rootfs for $suite"
-        if ! source_build_ensure_rootfs "$suite" wrap "" "" "" >/dev/null; then
-            warning "Pre-bake failed for $suite; wrap cell will retry/fallback"
+        info "Pre-baking wrap rootfs for $suite/$build_arch"
+        if ! source_build_ensure_rootfs "$suite" wrap "" "" "" "$build_arch" >/dev/null; then
+            warning "Pre-bake failed for $suite/$build_arch; wrap cell will retry/fallback"
         fi
     done
 }
@@ -783,7 +795,7 @@ source_build_run_wraps() {
 
     max="$(source_build_wrap_parallel_limit)"
     info "Wrapping $wrap_list (max $max concurrent)"
-    source_build_prebake_wrap_images "$wrap_list"
+    source_build_prebake_wrap_images "$wrap_list" "$build_arch"
 
     running=0
     for suite in $wrap_list; do
