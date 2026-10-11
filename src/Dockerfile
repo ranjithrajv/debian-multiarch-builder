@@ -122,15 +122,34 @@ RUN installable() { \
 # filename inside the release archive (e.g. mikefarah/yq ships
 # "yq_linux_amd64", "yq_linux_loong64", etc. rather than a plain "yq"),
 # which would otherwise install an executable users can't guess the name
-# of. When binary_rename is set in package.yaml and exactly one
-# executable was found, rename it to the expected command name.
+# of. When binary_rename is set in package.yaml, rename the tool's ELF
+# binary to the expected command name.
+#
+# Target the ELF rather than "the only file in /usr/bin": a release
+# tarball can also carry non-binary helpers, and those must not count
+# toward the rename decision. mikefarah/yq 4.54 added install-man-page.sh
+# next to yq_linux_*; that pushed the file count to 2, so the old
+# "exactly one file" guard took its else-branch and quietly shipped
+# yq_linux_amd64 as /usr/bin/yq_linux_amd64. The smoke gate still went
+# green, because it only asks whether *some* binary in /usr/bin reports
+# the expected version - so the broken name reached the apt repo.
 RUN if [ -n "$BINARY_RENAME" ]; then \
-        count=$(find /output/usr/bin -maxdepth 1 -type f | wc -l); \
-        if [ "$count" = "1" ]; then \
-            f=$(find /output/usr/bin -maxdepth 1 -type f); \
-            mv "$f" "/output/usr/bin/$BINARY_RENAME"; \
+        elf=$(find /output/usr/bin -maxdepth 1 -type f \
+                -exec sh -c 'file -b "$1" | grep -q "^ELF " && echo "$1"' _ {} \; 2>/dev/null || true); \
+        elf_count=$(printf '%s' "$elf" | grep -c . || true); \
+        rename_to() { \
+            [ "$1" = "/output/usr/bin/$BINARY_RENAME" ] || mv "$1" "/output/usr/bin/$BINARY_RENAME"; \
+        }; \
+        if [ "$elf_count" = "1" ]; then \
+            rename_to "$elf"; \
         else \
-            echo "WARNING: binary_rename set but found $count executables in /usr/bin, skipping rename" >&2; \
+            count=$(find /output/usr/bin -maxdepth 1 -type f | wc -l); \
+            if [ "$count" = "1" ]; then \
+                # Non-ELF tool (script-based package): preserve the old behaviour.
+                rename_to "$(find /output/usr/bin -maxdepth 1 -type f)"; \
+            else \
+                echo "WARNING: binary_rename set but found $count files ($elf_count ELF) in /usr/bin, skipping rename" >&2; \
+            fi; \
         fi \
     fi
 
