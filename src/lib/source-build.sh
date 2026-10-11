@@ -449,6 +449,21 @@ host_ccache=$4
 mode=$5
 env_name=$6
 mkdir -p "$dest/out" "$dest/cache" "$dest/ccache" "$dest/build" "$dest/proc" "$dest/dev"
+# /tmp and /run are excluded when the chroot is packed into its warm-cache
+# tarball (see source_build_ensure_rootfs) and are not restored on unpack, so
+# a chroot reused from the cache arrives without them - while one baked fresh
+# in the same run has them from the base image. That made the failure depend
+# on whether the cache was warm rather than on anything in the package.
+# quickshell hit it on the trixie/amd64 source build:
+#   dpkg-deb: error: failed to make temporary file (control member):
+#   No such file or directory
+# dpkg-deb stages the control member through a temp file, so a missing /tmp
+# is a hard ENOENT; apt, cmake and tar want it for the same reason. The
+# comment above the exclusion already says "the chroot recreates what it
+# needs" - it did not, for /tmp. Create both here, in the single path every
+# run takes (bake, cached unpack, reuse), so the three look the same.
+mkdir -p "$dest/tmp" "$dest/run"
+chmod 1777 "$dest/tmp"
 mount --bind "$host_pwd" "$dest/out"
 mount --bind "$host_cache" "$dest/cache"
 if [ "$mode" = "compile" ] && [ -n "$host_ccache" ] && [ -d "$host_ccache" ]; then
